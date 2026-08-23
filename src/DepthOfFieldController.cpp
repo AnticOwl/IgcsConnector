@@ -152,7 +152,7 @@ void DepthOfFieldController::loadIniFileData(CDataFile& iniFile)
 	loadFloatFromIni(iniFile, "VignettingEnd", &_vignettingEnd);
 	loadFloatFromIni(iniFile, "VignettingStrength", &_vignettingStrength);
 
-	_astigmatismStrength = IGCS::Utils::clampEx(_astigmatismStrength, 0.0f, 3.0f);
+	_astigmatismStrength = IGCS::Utils::clampEx(_astigmatismStrength, 0.0f, 2.0f);
 	_astigmatismRotation = IGCS::Utils::clampEx(_astigmatismRotation, 0.0f, 180.0f);
 	_vignettingStart = IGCS::Utils::clampEx(_vignettingStart, 0.0f, 0.999f);
 	_vignettingEnd = IGCS::Utils::clampEx(_vignettingEnd, 0.001f, 1.0f);
@@ -537,19 +537,20 @@ void DepthOfFieldController::applyAstigmatismFocusPlane(float x, float y, float 
 		return;
 	}
 
-	// Rotate the sample into the astigmatic frame. The two perpendicular axes
-	// receive opposite focus-plane offsets around the normal focus plane: one
-	// focuses nearer while the other focuses farther. Strength 0 is the original
-	// IGCS alignment; strength 1 gives 2x/0x focus compensation; values above 1
-	// intentionally exaggerate the split for strong lens-character effects.
+	// Astigmatic defocus is represented as a symmetric two-axis focus split.
+	// In the lens frame, one meridian is focused in front of the nominal plane
+	// and the orthogonal meridian behind it. Strength 0 is the stock IGCSDOF
+	// focus alignment. Strength 2 reaches the deliberately extreme 2x/0x split
+	// without inverting either focus axis.
 	const float angle = IGCS::Utils::degreesToRadians(_astigmatismRotation);
 	const float cosAngle = cosf(angle);
 	const float sinAngle = sinf(angle);
 	const float localX = (x * cosAngle) + (y * sinAngle);
 	const float localY = (-x * sinAngle) + (y * cosAngle);
 
-	const float nearAxisScale = 1.0f + _astigmatismStrength;
-	const float farAxisScale = 1.0f - _astigmatismStrength;
+	const float axisSplit = 0.5f * _astigmatismStrength;
+	const float nearAxisScale = 1.0f + axisSplit;
+	const float farAxisScale = 1.0f - axisSplit;
 	const float focusedLocalX = localX * nearAxisScale;
 	const float focusedLocalY = localY * farAxisScale;
 
@@ -831,6 +832,53 @@ void DepthOfFieldController::drawShape(ImDrawList* drawList, ImVec2 topLeftScree
 		ImColor dotColor = ImColor(step.sampleWeightRGB[0] / maxChannel, step.sampleWeightRGB[1] / maxChannel, step.sampleWeightRGB[2] / maxChannel);
 		drawList->AddCircleFilled(ImVec2(x + ((step.xDelta / maxBokehRadius) * maxRadius), y - ((step.yDelta / maxBokehRadius) * maxRadius)), 1.5f, dotColor);
 	}
+}
+
+
+void DepthOfFieldController::drawAstigmatismPreview(ImDrawList* drawList, ImVec2 topLeftScreenCoord, float width, float height)
+{
+	const ImVec2 bottomRight(topLeftScreenCoord.x + width, topLeftScreenCoord.y + height);
+	const ImVec2 center(topLeftScreenCoord.x + (width * 0.5f), topLeftScreenCoord.y + (height * 0.5f));
+	const ImU32 backgroundColor = IM_COL32(34, 34, 34, 255);
+	const ImU32 borderColor = IM_COL32(120, 120, 120, 255);
+	const ImU32 nominalColor = IM_COL32(185, 185, 185, 255);
+	const ImU32 nearColor = IM_COL32(255, 196, 96, 255);
+	const ImU32 farColor = IM_COL32(96, 190, 255, 255);
+	const ImU32 axisColor = IM_COL32(230, 230, 230, 120);
+
+	drawList->AddRectFilled(topLeftScreenCoord, bottomRight, backgroundColor);
+	drawList->AddRect(topLeftScreenCoord, bottomRight, borderColor);
+
+	const float angle = IGCS::Utils::degreesToRadians(_astigmatismRotation);
+	const float cosAngle = cosf(angle);
+	const float sinAngle = sinf(angle);
+	const ImVec2 axisA(cosAngle, -sinAngle);
+	const ImVec2 axisB(-sinAngle, -cosAngle);
+	const float axisLength = std::min(width, height) * 0.34f;
+
+	// The central cross shows the two astigmatic meridians in the image plane.
+	drawList->AddLine(ImVec2(center.x - axisA.x * axisLength, center.y - axisA.y * axisLength), ImVec2(center.x + axisA.x * axisLength, center.y + axisA.y * axisLength), axisColor, 1.0f);
+	drawList->AddLine(ImVec2(center.x - axisB.x * axisLength, center.y - axisB.y * axisLength), ImVec2(center.x + axisB.x * axisLength, center.y + axisB.y * axisLength), axisColor, 1.0f);
+	drawList->AddCircleFilled(center, 3.0f, IM_COL32(255, 255, 255, 255));
+
+	// Side view of the focal split. Strength is mapped exactly like the render
+	// math: 0..2 becomes a symmetric 0..1 split around the nominal focus plane.
+	const float splitNormalized = (_astigmatismEnabled ? _astigmatismStrength : 0.0f) * 0.5f;
+	const float maxPlaneOffset = width * 0.23f;
+	const float planeOffset = splitNormalized * maxPlaneOffset;
+	const float planeHalfHeight = height * 0.32f;
+	const float nominalX = center.x;
+	const float nearX = center.x - planeOffset;
+	const float farX = center.x + planeOffset;
+
+	drawList->AddLine(ImVec2(nominalX, center.y - planeHalfHeight), ImVec2(nominalX, center.y + planeHalfHeight), nominalColor, 1.5f);
+	drawList->AddLine(ImVec2(nearX, center.y - planeHalfHeight), ImVec2(nearX, center.y + planeHalfHeight), nearColor, 2.0f);
+	drawList->AddLine(ImVec2(farX, center.y - planeHalfHeight), ImVec2(farX, center.y + planeHalfHeight), farColor, 2.0f);
+
+	drawList->AddText(ImVec2(topLeftScreenCoord.x + 8.0f, topLeftScreenCoord.y + 7.0f), nominalColor, "Astigmatism focal split");
+	drawList->AddText(ImVec2(nearX - 18.0f, bottomRight.y - 20.0f), nearColor, "Near");
+	drawList->AddText(ImVec2(nominalX - 22.0f, bottomRight.y - 20.0f), nominalColor, "Focus");
+	drawList->AddText(ImVec2(farX - 12.0f, bottomRight.y - 20.0f), farColor, "Far");
 }
 
 
