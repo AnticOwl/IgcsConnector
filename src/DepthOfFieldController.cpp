@@ -49,23 +49,18 @@ void DepthOfFieldController::setMaxBokehSize(reshade::api::effect_runtime* runti
 {
 	if(DepthOfFieldControllerState::Setup != _state || newValue <=0.0f)
 	{
-		// not in setup or value is out of range
 		return;
 	}
 
 	const float oldValue = _maxBokehSize;
 	_maxBokehSize = newValue;
-	// recalculate focus x/y
 	if(oldValue > 0.0f)
 	{
 		const float ratio = _maxBokehSize / oldValue;
 		_focusDelta *= ratio;
 	}
 	calculateShapePoints();
-
-	// we have to move the camera over the new distance. We move relative to the start position.
 	_cameraToolsConnector.moveCameraMultishot(_maxBokehSize, 0.0f, 0.0f, true);
-	// the value is passed to the shader next present call
 }
 
 
@@ -73,16 +68,11 @@ void DepthOfFieldController::setXFocusDelta(reshade::api::effect_runtime* runtim
 {
 	if(DepthOfFieldControllerState::Setup!=_state)
 	{
-		// not in setup
 		return;
 	}
 	_focusDelta = newValueX;
-
 	calculateShapePoints();
-
-	// set the uniform in the shader for blending the new framebuffer so the user has visual feedback
 	setUniformFloatVariable(runtime, "FocusDelta", _focusDelta);
-	// the value is passed to the shader next present call
 }
 
 
@@ -150,8 +140,10 @@ void DepthOfFieldController::loadIniFileData(CDataFile& iniFile)
 	loadFloatFromIni(iniFile, "AnamorphicFactor", &_anamorphicFactor);
 	loadBoolFromIni(iniFile, "AstigmatismEnabled", &_astigmatismEnabled, false);
 	loadFloatFromIni(iniFile, "AstigmatismStrength", &_astigmatismStrength);
+	loadFloatFromIni(iniFile, "AstigmatismFocusShiftStrength", &_astigmatismFocusShiftStrength);
 	loadFloatFromIni(iniFile, "AstigmatismRotation", &_astigmatismRotation);
 	_astigmatismStrength = IGCS::Utils::clampEx(_astigmatismStrength, 0.0f, 1.0f);
+	_astigmatismFocusShiftStrength = IGCS::Utils::clampEx(_astigmatismFocusShiftStrength, 0.0f, 1.0f);
 	_astigmatismRotation = IGCS::Utils::clampEx(_astigmatismRotation, 0.0f, 180.0f);
 	loadFloatFromIni(iniFile, "RingAngleOffset", &_ringAngleOffset);
 	loadFloatFromIni(iniFile, "RotationAngle", &_apertureShapeSettings.RotationAngle);
@@ -190,6 +182,7 @@ void DepthOfFieldController::saveIniFileData(CDataFile& iniFile)
 	iniFile.SetFloat("AnamorphicFactor", _anamorphicFactor, "", "DepthOfField");
 	iniFile.SetBool("AstigmatismEnabled", _astigmatismEnabled, "", "DepthOfField");
 	iniFile.SetFloat("AstigmatismStrength", _astigmatismStrength, "", "DepthOfField");
+	iniFile.SetFloat("AstigmatismFocusShiftStrength", _astigmatismFocusShiftStrength, "", "DepthOfField");
 	iniFile.SetFloat("AstigmatismRotation", _astigmatismRotation, "", "DepthOfField");
 	iniFile.SetFloat("RingAngleOffset", _ringAngleOffset, "", "DepthOfField");
 	iniFile.SetFloat("RotationAngle", _apertureShapeSettings.RotationAngle, "", "DepthOfField");
@@ -234,16 +227,13 @@ void DepthOfFieldController::startSession(reshade::api::effect_runtime* runtime)
 		_reshadeStateAtStart.obtainReshadeState(runtime);
 	}
 
-	// set uniform variable 'SessionState' to 1 (start)
 	_state = DepthOfFieldControllerState::Start;
 	_renderPaused = false;
 	setUniformIntVariable(runtime, "SessionState", (int)_state);
-	// set framecounter to 3 so we wait 3 frames before moving on to 'Setup'
-	_onPresentWorkCounter = 3;	// wait 3 frames
+	_onPresentWorkCounter = 3;
 	_onPresentWorkFunc = [&](reshade::api::effect_runtime* r)
 	{
 		this->_state = DepthOfFieldControllerState::Setup;
-		// we have to move the camera over the new distance. We move relative to the start position.
 		_cameraToolsConnector.moveCameraMultishot(_maxBokehSize, 0.0f, 0.0f, true);
 	};
 }
@@ -268,7 +258,6 @@ void DepthOfFieldController::reshadeBeginEffectsCalled(reshade::api::effect_runt
 	{
 		return;
 	}
-	// First handle data changing work
 	if(_onPresentWorkCounter<=0)
 	{
 		_onPresentWorkCounter = 0;
@@ -276,9 +265,7 @@ void DepthOfFieldController::reshadeBeginEffectsCalled(reshade::api::effect_runt
 		if(nullptr!=_onPresentWorkFunc)
 		{
 			const std::function<void(reshade::api::effect_runtime*)> funcToCall = _onPresentWorkFunc;
-			// reset the current func to nullptr so next time we won't call it again.
 			_onPresentWorkFunc = nullptr;
-
 			funcToCall(runtime);
 		}
 	}
@@ -292,9 +279,6 @@ void DepthOfFieldController::reshadeBeginEffectsCalled(reshade::api::effect_runt
 		handlePresentBeforeReshadeEffects();
 	}
 
-	// Then make sure the shader knows our changed data...
-
-	// always write the variables, as otherwise they'll lose their value when the user e.g. hotsamples.
 	writeVariableStateToShader(runtime);
 }
 
@@ -315,7 +299,6 @@ void DepthOfFieldController::reshadeFinishEffectsCalled(reshade::api::effect_run
 
 void DepthOfFieldController::performRenderFrameSetupWork()
 {
-	// move camera and set counter and move to next state
 	if(_currentStepFrame < _cameraSteps.size())
 	{
 		const auto& currentStepFrameData = _cameraSteps[_currentStepFrame];
@@ -328,15 +311,13 @@ void DepthOfFieldController::performRenderFrameSetupWork()
 		const auto& currentBlendFrameData = _cameraSteps[_currentBlendFrame];
 		_xAlignmentDelta = currentBlendFrameData.xAlignmentDelta;
 		_yAlignmentDelta = currentBlendFrameData.yAlignmentDelta;
-		_blendFactor = 1.0f / (static_cast<float>(_currentBlendFrame) + 1.0f);		// frame start at 0 so +1, to get 1/1=100% blend factor for first frame
+		_blendFactor = 1.0f / (static_cast<float>(_currentBlendFrame) + 1.0f);
 
-		//since the lerp blending implicitly already divides the sum by N, we must not do it again, so compensate
 		const float numSamples = static_cast<float>(_cameraSteps.size());
 		_sampleWeightRGB[0] = currentBlendFrameData.sampleWeightRGB[0] * numSamples;
 		_sampleWeightRGB[1] = currentBlendFrameData.sampleWeightRGB[1] * numSamples;
 		_sampleWeightRGB[2] = currentBlendFrameData.sampleWeightRGB[2] * numSamples;
 	}
-	// Set the framestate to rendering frames, to make sure we're proceeding. 
 	_renderFrameState = DepthOfFieldRenderFrameState::RenderingFrames;
 }
 
@@ -352,23 +333,16 @@ void DepthOfFieldController::handlePresentBeforeReshadeEffects()
 	{
 		case DepthOfFieldRenderFrameState::Off:
 		case DepthOfFieldRenderFrameState::Start:
-			// no-op
 			break;
 		case DepthOfFieldRenderFrameState::RenderingFrames:
 			{
 				if(!_renderPaused)
 				{
-					// in this before effects handler, we check if we have to blend. We do this with the blend counter. 
-					// check if counter is 0. If so, switch to next state, if not, decrease and do nothing
 					if(_blendCounter <= 0)
 					{
 						_blendCounter = 0;
 						if(_currentBlendFrame >= 0)
 						{
-							// Ready to blend. As we're currently before the reshade effects are handled but after the frame has been drawn by the engine
-							// we can set blendFrame to true here and the shader will blend the current framebuffer this frame.
-							// This works because after this method, the uniforms are written to the shader, so the shader will pick the new value up
-							// when it's being drawn 
 							_blendFrame = true;
 						}
 					}
@@ -393,28 +367,20 @@ void DepthOfFieldController::handlePresentAfterReshadeEffects()
 	switch(_renderFrameState)
 	{
 		case DepthOfFieldRenderFrameState::Off:
-			// no-op
 			break;
 		case DepthOfFieldRenderFrameState::Start:
-			// start state of the whole process. Only arriving here once per render session.
 			performRenderFrameSetupWork();
 			break;
 		case DepthOfFieldRenderFrameState::RenderingFrames:
 			{
-				// In this after effects handler, we check if we have blended a frame, and if so, we move the pointer. We also 
-				// detetermine if we have to step the camera. 
 				if(_blendFrame)
 				{
-					// Blending work has taken place, we're now done with that as the shader has run. We switch it off by resetting the variable.
-					// This variable is written to the shader at the end of the handler called before the reshade effects will be rendered (reshadeBeginEffectsCalled), so
-					// it will take effect then. (the shader isn't run before that point so it's ok).
 					_blendFrame = false;
 					_currentBlendFrame++;
 					_blendCounter = _numberOfFramesToWait;
 				}
 				if(_currentBlendFrame >= _numberOfFramesToRender)
 				{
-					// we're done rendering
 					_renderFrameState = DepthOfFieldRenderFrameState::Off;
 					_state = DepthOfFieldControllerState::Done;
 					reshade::log::message(reshade::log::level::info, "Dof render session completed");
@@ -426,7 +392,6 @@ void DepthOfFieldController::handlePresentAfterReshadeEffects()
 						if(_stepCounter <= 0)
 						{
 							_stepCounter = 0;
-							// back to setup for the next frame
 							performRenderFrameSetupWork();
 						}
 						else
@@ -443,16 +408,8 @@ void DepthOfFieldController::handlePresentAfterReshadeEffects()
 
 void DepthOfFieldController::applySphericalAberration(float radiusNormalized, CameraLocation& sample)
 {
-	//radius^4 yields plausible results, see for analysis https://jtra.cz/stuff/essays/bokeh/index.html
-	//this is theoretically incorrect, as aberration should be caused by light taking different paths, i.e. it could be
-	//emulated by modifying the camera angles and correctly deliver inverted bokeh in foreground, 
-	//however this would yield blurry focal areas which we don't want. So approximate it with sample masking
-
 	float aberrationCurve = radiusNormalized * radiusNormalized;
-	aberrationCurve *= aberrationCurve; 
-
-	//lerp between flat profile and curve with intensity 0 in center
-	//*0.99 -> ensure samples in center are never _exactly_ zero, this avoids issues with renormalized sample weights
+	aberrationCurve *= aberrationCurve;
 	const float aberrationFactor = (1.0f - _sphericalAberrationDimFactor * 0.99f) + _sphericalAberrationDimFactor * aberrationCurve * 0.99f;
 
 	sample.sampleWeightRGB[0] *= aberrationFactor;
@@ -463,7 +420,6 @@ void DepthOfFieldController::applySphericalAberration(float radiusNormalized, Ca
 
 float DepthOfFieldController::calculateChannelDimFactor(float angleSegment, float segmentAngleMin, int numberOfSegments)
 {
-	// using Iq's parabola using k==0.5, see: https://www.desmos.com/calculator/aszway25gw and https://iquilezles.org/articles/functions/
 	const float segmentSize = 1.0f / (float)(numberOfSegments ==0 ? 1 : numberOfSegments);
 	const float angleToSegmentNormalized = IGCS::Utils::clampEx(angleSegment - segmentAngleMin, 0.0f, segmentSize) / segmentSize;
 	return std::pow(4.0f * angleToSegmentNormalized * (1.0f - angleToSegmentNormalized), 0.5f);
@@ -473,22 +429,15 @@ float DepthOfFieldController::calculateChannelDimFactor(float angleSegment, floa
 void DepthOfFieldController::applyFringe(float ringRadiusNormalized, float sampleAngle, CameraLocation& sample)
 {
 	const float transitionWidth = 0.5f / (float)_quality;
-	// perform a linear step with the spacing of a ring radius
-	
-	//(x-a)/(b-a)
 	const float fringeRampStart = 1.0f - _fringeWidth - transitionWidth;
 	const float fringeRampEnd   = 1.0f - _fringeWidth + transitionWidth;
 	const float fringeMask = IGCS::Utils::clampEx((ringRadiusNormalized - fringeRampStart) / (fringeRampEnd - fringeRampStart), 0.0f, 1.0f);
 	const float fringeFactor = (1.0f - _fringeIntensity) * (1.0f - fringeMask) + fringeMask;
 
-	// factors for the dimming. 1.0 means visible, 0.0 means dimmed 100%
 	float blueFactor = 1.0f;
 	float greenFactor = 1.0f;
 	float redFactor = 1.0f;
 	const float angleSegment = sampleAngle / 6.28318530717958f;
-	// for 3 segments: 
-	// 0-0.33333: blue, 0.33333-0.6666: green, 0.6666-1: red
-	// for 2 segments, the two colors in the type both have 0.5
 
 	DepthOfFieldColorChannel segmentOneProminentColor = DepthOfFieldColorChannel::Red;
 	DepthOfFieldColorChannel segmentTwoProminentColor = DepthOfFieldColorChannel::Green;
@@ -498,11 +447,9 @@ void DepthOfFieldController::applyFringe(float ringRadiusNormalized, float sampl
 	switch(_caType)
 	{
 		case DepthOfFieldCAType::RGB:
-			// The defaults are ok for this setup
 			break;
 		case DepthOfFieldCAType::RG:
 			numberOfSegments = 2;
-			// prominent color defaults are ok for this setup
 			break;
 		case DepthOfFieldCAType::RB:
 			numberOfSegments = 2;
@@ -520,8 +467,6 @@ void DepthOfFieldController::applyFringe(float ringRadiusNormalized, float sampl
 	bool greenChannelDimmable = true;
 	bool blueChannelDimmable = true;
 	float dimFactor = 0.0f;
-	// cheap filter out segments and apply operands. Per segment a channel is prominent and the others are dimmed graciously
-	// execution flow will always arrive in 1 if handler below so we can use that to our advantage with setting flags for the final calculations
 	if(angleSegment <= segmentOneMaxAngle)
 	{
 		dimFactor = 1.0f - calculateChannelDimFactor(angleSegment, 0.0f, numberOfSegments);
@@ -533,7 +478,6 @@ void DepthOfFieldController::applyFringe(float ringRadiusNormalized, float sampl
 	{
 		if(angleSegment <= segmentTwoMaxAngle)
 		{
-			// last segment for 2 colors, middle segment for 3 colors
 			dimFactor = 1.0f - calculateChannelDimFactor(angleSegment, segmentOneMaxAngle, numberOfSegments);
 			redChannelDimmable = segmentTwoProminentColor != DepthOfFieldColorChannel::Red;
 			greenChannelDimmable = segmentTwoProminentColor != DepthOfFieldColorChannel::Green;
@@ -541,7 +485,6 @@ void DepthOfFieldController::applyFringe(float ringRadiusNormalized, float sampl
 		}
 		else
 		{
-			// last segment for 3 colors, for 2 color ca we'll never end up here. 
 			dimFactor = 1.0f - calculateChannelDimFactor(angleSegment, segmentTwoMaxAngle, numberOfSegments);
 			redChannelDimmable = segmentThreeProminentColor != DepthOfFieldColorChannel::Red;
 			greenChannelDimmable = segmentThreeProminentColor != DepthOfFieldColorChannel::Green;
@@ -571,9 +514,6 @@ void DepthOfFieldController::applyAstigmatism(float& x, float& y)
 		return;
 	}
 
-	// The rotation value describes the major axis of the astigmatic ellipse.
-	// We only compress the perpendicular axis, so enabling astigmatism never
-	// increases the maximum camera travel beyond MaxBokehSize.
 	const float angle = IGCS::Utils::degreesToRadians(_astigmatismRotation);
 	const float cosAngle = cosf(angle);
 	const float sinAngle = sinf(angle);
@@ -587,13 +527,41 @@ void DepthOfFieldController::applyAstigmatism(float& x, float& y)
 }
 
 
+void DepthOfFieldController::applyAstigmatismFocusShift(float x, float y, float focusDeltaHalf, float& xAlignmentDelta, float& yAlignmentDelta)
+{
+	if(!_astigmatismEnabled || _astigmatismFocusShiftStrength <= FLT_EPSILON || fabsf(focusDeltaHalf) <= FLT_EPSILON)
+	{
+		return;
+	}
+
+	// Split the focus compensation between the two astigmatic axes around the
+	// normal focus plane: one axis focuses slightly nearer, the perpendicular
+	// axis slightly farther. This keeps the average focus position unchanged.
+	const float angle = IGCS::Utils::degreesToRadians(_astigmatismRotation);
+	const float cosAngle = cosf(angle);
+	const float sinAngle = sinf(angle);
+	const float localX = (x * cosAngle) + (y * sinAngle);
+	const float localY = (-x * sinAngle) + (y * cosAngle);
+	const float halfStrength = 0.5f * _astigmatismFocusShiftStrength;
+
+	const float localShiftX = -localX * halfStrength;
+	const float localShiftY = localY * halfStrength;
+	const float worldShiftX = (localShiftX * cosAngle) - (localShiftY * sinAngle);
+	const float worldShiftY = (localShiftX * sinAngle) + (localShiftY * cosAngle);
+
+	// Keep the same X/Y sign convention used by the existing focus alignment.
+	xAlignmentDelta += -worldShiftX * focusDeltaHalf;
+	yAlignmentDelta += worldShiftY * focusDeltaHalf;
+}
+
+
 void DepthOfFieldController::createCircleDoFPoints()
 {
 	_cameraSteps.clear();
 
 	CameraLocation center = {0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f};
-	applySphericalAberration(0.0f, center);	
-	applyFringe(0.0f, 0.0f, center);	
+	applySphericalAberration(0.0f, center);
+	applyFringe(0.0f, 0.0f, center);
 	_cameraSteps.push_back(center);
 
 	const float pointsFirstRing = (float)_numberOfPointsInnermostRing;
@@ -614,10 +582,12 @@ void DepthOfFieldController::createCircleDoFPoints()
 			applyAstigmatism(x, y);
 			const float xDelta = maxBokehRadius * x;
 			const float yDelta = maxBokehRadius * y;
+			float xAlignmentDelta = x * -focusDeltaHalf;
+			float yAlignmentDelta = y * focusDeltaHalf;
+			applyAstigmatismFocusShift(x, y, focusDeltaHalf, xAlignmentDelta, yAlignmentDelta);
 
-			CameraLocation sample = {xDelta, yDelta, x * -focusDeltaHalf, y * focusDeltaHalf, 1.0f, 1.0f, 1.0f};	
+			CameraLocation sample = {xDelta, yDelta, xAlignmentDelta, yAlignmentDelta, 1.0f, 1.0f, 1.0f};
 			applySphericalAberration(ringDistance, sample);
-			// angle 0 is on the right of the circle but we want it to be up top, so we subtract 1/2pi from it so the angle for the color is transposed 90 degrees.
 			applyFringe(ringDistance, fmod((angle-(6.28318530717958f / 4.0f)) + 6.28318530717958f, 6.28318530717958f), sample);
 			_cameraSteps.push_back(sample);
 
@@ -642,7 +612,6 @@ void DepthOfFieldController::createApertureShapedDoFPoints()
 	applyFringe(0.0f, 0.0f, center);
 	_cameraSteps.push_back(center);
 
-	// sanitize input for 4 vertex elements
 	if(4 == _apertureShapeSettings.NumberOfVertices)
 	{
 		if(_ringAngleOffset<-0.015f || _ringAngleOffset > 0.015f)
@@ -657,9 +626,8 @@ void DepthOfFieldController::createApertureShapedDoFPoints()
 	for(int ringNo = 1; ringNo <= _quality; ringNo++)
 	{
 		float vertexAngleForFringe = 0.0f;
-		// ring angle offset is applied stronger on inner rings than on outer rings, to keep the outer ring from staying in the same place. 
 		float vertexAngle = fmod((_apertureShapeSettings.RotationAngle * 6.28318530717958f) + ((float)(_quality-ringNo) * _ringAngleOffset), 6.28318530717958f);
-		const float ringDistance = (float)ringNo / (float)_quality;		
+		const float ringDistance = (float)ringNo / (float)_quality;
 		for(int vertexNo = 0; vertexNo < _apertureShapeSettings.NumberOfVertices; vertexNo++)
 		{
 			const float sinAngleCurrentVertex = sin(vertexAngle);
@@ -685,16 +653,16 @@ void DepthOfFieldController::createApertureShapedDoFPoints()
 				const float yLinePoint = IGCS::Utils::lerp(yCurrentVertex, yNextVertex, pointStep);
 				float x = IGCS::Utils::lerp(xLinePoint, xRoundPoint, _apertureShapeSettings.RoundFactor);
 				float y = IGCS::Utils::lerp(yLinePoint, yRoundPoint, _apertureShapeSettings.RoundFactor);
-				//cannot use ringDistance in polygonal mode, as spherical aberration is purely a factor of radius and ringDistance follows aperture shape
-				//hence use euclidean distance from center instead. However, spherical aberration happens before anamorphic film squeeze
-				//as the anamorphic lens is the last lens in front of the sensor/film
-				const float radiusNormalized = sqrtf(x * x + y * y); 
-				x *= _anamorphicFactor; //apply scaling here after calculating spherical aberration
+				const float radiusNormalized = sqrtf(x * x + y * y);
+				x *= _anamorphicFactor;
 				applyAstigmatism(x, y);
 				const float xDelta = maxBokehRadius * x;
 				const float yDelta = maxBokehRadius * y;
-				CameraLocation sample = {xDelta, yDelta, x * -focusDeltaHalf, y * focusDeltaHalf, 1.0f, 1.0f, 1.0f};	
-				applySphericalAberration(radiusNormalized, sample);	
+				float xAlignmentDelta = x * -focusDeltaHalf;
+				float yAlignmentDelta = y * focusDeltaHalf;
+				applyAstigmatismFocusShift(x, y, focusDeltaHalf, xAlignmentDelta, yAlignmentDelta);
+				CameraLocation sample = {xDelta, yDelta, xAlignmentDelta, yAlignmentDelta, 1.0f, 1.0f, 1.0f};
+				applySphericalAberration(radiusNormalized, sample);
 				applyFringe(ringDistance, pointAngleForFringe, sample);
 				_cameraSteps.push_back(sample);
 				pointStep += pointStepSize;
@@ -713,7 +681,6 @@ void DepthOfFieldController::createApertureShapedDoFPoints()
 
 void DepthOfFieldController::renormalizeBokehWeights()
 {
-	//renormalize bokeh weights so they do not scale the exposure or add a tint	
 	float weightSumRGB[3] = { 0.0f, 0.0f, 0.0f };
 	for(const auto& step : _cameraSteps)
 	{
@@ -735,10 +702,8 @@ void DepthOfFieldController::applyRenderOrder()
 	switch(_renderOrder)
 	{
 		case DepthOfFieldRenderOrder::InnerRingToOuterRing:
-			// nothing, we're already having the points in the right order
 			break;
 		case DepthOfFieldRenderOrder::OuterRingToInnerRing:
-			// reverse the container.
 			std::ranges::reverse(_cameraSteps);
 			break;
 		case DepthOfFieldRenderOrder::Randomized:
@@ -756,7 +721,7 @@ void DepthOfFieldController::calculateShapePoints()
 		case DepthOfFieldBlurType::ApertureShape:
 			createApertureShapedDoFPoints();
 			break;
-		case DepthOfFieldBlurType::Circular: 
+		case DepthOfFieldBlurType::Circular:
 			createCircleDoFPoints();
 			break;
 	}
@@ -772,30 +737,26 @@ void DepthOfFieldController::startRender(reshade::api::effect_runtime* runtime)
 
 	if(_state!=DepthOfFieldControllerState::Setup)
 	{
-		// not in the right previous state
 		return;
 	}
 
 	reshade::log::message(reshade::log::level::info, "Dof render session started");
 
-	// set initial shader start state
 	_blendFrame = false;
 	_blendFactor = 0.0f;
 	_currentStepFrame = 0;
 	_currentBlendFrame = 0;
-	_stepCounter = 0;			// as we start immediately with a step
+	_stepCounter = 0;
 	switch(_frameWaitType)
 	{
 		case DepthOfFieldFrameWaitType::Classic:
-			_numberOfFramesToWait = std::max(_numberOfFramesToWait, 1);		// minimal 1 for classic
+			_numberOfFramesToWait = std::max(_numberOfFramesToWait, 1);
 			_blendCounter = _numberOfFramesToWait;
 			break;
 		case DepthOfFieldFrameWaitType::Fast:
 		{
-			_numberOfFramesToWait = std::max(_numberOfFramesToWait, 0);		// minimal 0 for fast
-			// subtract 1 from the value, clamp it at 0. We subtract 1 because with fixed tools, the step data is written to the game's memory the same frame, which requires 0 frames in flight
-			// for a game which has 1 buffer
-			int numberOfFramesInFlightToUse = std::max(_numberOfFramesInFlight-1, 0);	// minimal 0
+			_numberOfFramesToWait = std::max(_numberOfFramesToWait, 0);
+			int numberOfFramesInFlightToUse = std::max(_numberOfFramesInFlight-1, 0);
 			_blendCounter = numberOfFramesInFlightToUse + _numberOfFramesToWait;
 		}
 			break;
@@ -827,15 +788,11 @@ void DepthOfFieldController::migrateReshadeState(reshade::api::effect_runtime* r
 		std::scoped_lock lock(_reshadeStateMutex);
 		ReshadeStateSnapshot newState;
 		newState.obtainReshadeState(runtime);
-		// we don't care about the variable values, only about id's and variable names. So we can replace what we have with the new state.
-		// If the new state is empty, that's fine, setting variables takes care of that. 
 		_reshadeStateAtStart = newState;
 	}
-		
-	// if the newstate is empty we do nothing. If the new state isn't empty we had a migration and the variables are valid.
+
 	if(!isReshadeStateEmpty() && _state == DepthOfFieldControllerState::Setup)
 	{
-		// we now restart the session. This is necessary because we lose the cached start texture.
 		endSession(runtime);
 		startSession(runtime);
 	}
@@ -851,14 +808,11 @@ void DepthOfFieldController::drawShape(ImDrawList* drawList, ImVec2 topLeftScree
 
 	const float x = canvasWidthHeight / 2.0f + topLeftScreenCoord.x;
 	const float y = canvasWidthHeight / 2.0f + topLeftScreenCoord.y;
-	const float maxRadius = (canvasWidthHeight / 2.0f)-5.0f;	// to have some space around the edge
+	const float maxRadius = (canvasWidthHeight / 2.0f)-5.0f;
 	float maxBokehRadius = _maxBokehSize / 2.0f;
 	maxBokehRadius = maxBokehRadius < FLT_EPSILON ? 1.0f : maxBokehRadius;
 
-	//aberration weights are normalized to sum up to 1, meaning if inner samples are weighted < 1, outer samples must be weighted > 1
-	//but since we can't display values > 1, we need to figure out the maximum value. As we might have shuffled them for random order rendering
-	//we can't just take the busy bokeh factor of innermost or outermost ring.
-	float maxChannel = 0.0f; //scale all channels by the same amount
+	float maxChannel = 0.0f;
 	for(const auto& step : _cameraSteps)
 	{
 		maxChannel = std::max(maxChannel, step.sampleWeightRGB[0]);
@@ -869,7 +823,6 @@ void DepthOfFieldController::drawShape(ImDrawList* drawList, ImVec2 topLeftScree
 	for(const auto& step : _cameraSteps)
 	{
 		ImColor dotColor = ImColor(step.sampleWeightRGB[0] / maxChannel, step.sampleWeightRGB[1] / maxChannel, step.sampleWeightRGB[2] / maxChannel);
-		// our (0,0) for rendering is top left, however the (0, 0) for the canvas is bottom left.
 		drawList->AddCircleFilled(ImVec2(x + ((step.xDelta / maxBokehRadius) * maxRadius), y - ((step.yDelta / maxBokehRadius) * maxRadius)), 1.5f, dotColor);
 	}
 }
@@ -958,13 +911,13 @@ void DepthOfFieldController::loadIntFromIni(CDataFile& iniFile, const std::strin
 	}
 }
 
+
 void DepthOfFieldController::loadBoolFromIni(CDataFile& iniFile, const std::string& key, bool* toWriteTo, bool defaultValue)
 {
 	if(nullptr==toWriteTo)
 	{
 		return;
 	}
-	// a little inefficient, but getkey is protected
 	const auto boolAsString = iniFile.GetValue(key, "DepthOfField");
 	bool valueToUse = defaultValue;
 	if(!boolAsString.empty())
