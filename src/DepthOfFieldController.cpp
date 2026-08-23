@@ -127,6 +127,11 @@ void DepthOfFieldController::writeVariableStateToShader(reshade::api::effect_run
 	setUniformFloatVariable(runtime, "CateyeRadiusStart", _catEyeRadiusStart);
 	setUniformFloatVariable(runtime, "CateyeRadiusEnd", _catEyeRadiusEnd);
 	setUniformFloatVariable(runtime, "CateyeIntensity", _catEyeBokehIntensity);
+
+	setUniformBoolVariable(runtime, "VignettingEnabled", _vignettingEnabled);
+	setUniformFloatVariable(runtime, "VignettingStart", _vignettingStart);
+	setUniformFloatVariable(runtime, "VignettingEnd", _vignettingEnd);
+	setUniformFloatVariable(runtime, "VignettingStrength", _vignettingStrength);
 }
 
 
@@ -137,14 +142,26 @@ void DepthOfFieldController::loadIniFileData(CDataFile& iniFile)
 	loadFloatFromIni(iniFile, "HighlightGammaFactor", &_highlightGammaFactor);
 	loadFloatFromIni(iniFile, "MagnificationAreaWidth", &_magnificationSettings.WidthMagnifierArea);
 	loadFloatFromIni(iniFile, "MagnificationAreaHeight", &_magnificationSettings.HeightMagnifierArea);
+	loadBoolFromIni(iniFile, "AnamorphicEnabled", &_anamorphicEnabled, true);
 	loadFloatFromIni(iniFile, "AnamorphicFactor", &_anamorphicFactor);
 	loadBoolFromIni(iniFile, "AstigmatismEnabled", &_astigmatismEnabled, false);
 	loadFloatFromIni(iniFile, "AstigmatismStrength", &_astigmatismStrength);
-	loadFloatFromIni(iniFile, "AstigmatismFocusShiftStrength", &_astigmatismFocusShiftStrength);
 	loadFloatFromIni(iniFile, "AstigmatismRotation", &_astigmatismRotation);
-	_astigmatismStrength = IGCS::Utils::clampEx(_astigmatismStrength, 0.0f, 1.0f);
-	_astigmatismFocusShiftStrength = IGCS::Utils::clampEx(_astigmatismFocusShiftStrength, 0.0f, 1.0f);
+	loadBoolFromIni(iniFile, "VignettingEnabled", &_vignettingEnabled, false);
+	loadFloatFromIni(iniFile, "VignettingStart", &_vignettingStart);
+	loadFloatFromIni(iniFile, "VignettingEnd", &_vignettingEnd);
+	loadFloatFromIni(iniFile, "VignettingStrength", &_vignettingStrength);
+
+	_astigmatismStrength = IGCS::Utils::clampEx(_astigmatismStrength, 0.0f, 3.0f);
 	_astigmatismRotation = IGCS::Utils::clampEx(_astigmatismRotation, 0.0f, 180.0f);
+	_vignettingStart = IGCS::Utils::clampEx(_vignettingStart, 0.0f, 0.999f);
+	_vignettingEnd = IGCS::Utils::clampEx(_vignettingEnd, 0.001f, 1.0f);
+	if(_vignettingEnd <= _vignettingStart)
+	{
+		_vignettingEnd = std::min(1.0f, _vignettingStart + 0.001f);
+	}
+	_vignettingStrength = IGCS::Utils::clampEx(_vignettingStrength, 0.0f, 1.0f);
+
 	loadFloatFromIni(iniFile, "RingAngleOffset", &_ringAngleOffset);
 	loadFloatFromIni(iniFile, "RotationAngle", &_apertureShapeSettings.RotationAngle);
 	loadFloatFromIni(iniFile, "RoundFactor", &_apertureShapeSettings.RoundFactor);
@@ -179,11 +196,15 @@ void DepthOfFieldController::saveIniFileData(CDataFile& iniFile)
 	iniFile.SetFloat("HighlightGammaFactor", _highlightGammaFactor, "", "DepthOfField");
 	iniFile.SetFloat("MagnificationAreaWidth", _magnificationSettings.WidthMagnifierArea, "", "DepthOfField");
 	iniFile.SetFloat("MagnificationAreaHeight", _magnificationSettings.HeightMagnifierArea, "", "DepthOfField");
+	iniFile.SetBool("AnamorphicEnabled", _anamorphicEnabled, "", "DepthOfField");
 	iniFile.SetFloat("AnamorphicFactor", _anamorphicFactor, "", "DepthOfField");
 	iniFile.SetBool("AstigmatismEnabled", _astigmatismEnabled, "", "DepthOfField");
 	iniFile.SetFloat("AstigmatismStrength", _astigmatismStrength, "", "DepthOfField");
-	iniFile.SetFloat("AstigmatismFocusShiftStrength", _astigmatismFocusShiftStrength, "", "DepthOfField");
 	iniFile.SetFloat("AstigmatismRotation", _astigmatismRotation, "", "DepthOfField");
+	iniFile.SetBool("VignettingEnabled", _vignettingEnabled, "", "DepthOfField");
+	iniFile.SetFloat("VignettingStart", _vignettingStart, "", "DepthOfField");
+	iniFile.SetFloat("VignettingEnd", _vignettingEnd, "", "DepthOfField");
+	iniFile.SetFloat("VignettingStrength", _vignettingStrength, "", "DepthOfField");
 	iniFile.SetFloat("RingAngleOffset", _ringAngleOffset, "", "DepthOfField");
 	iniFile.SetFloat("RotationAngle", _apertureShapeSettings.RotationAngle, "", "DepthOfField");
 	iniFile.SetFloat("RoundFactor", _apertureShapeSettings.RoundFactor, "", "DepthOfField");
@@ -507,51 +528,36 @@ void DepthOfFieldController::applyFringe(float ringRadiusNormalized, float sampl
 }
 
 
-void DepthOfFieldController::applyAstigmatism(float& x, float& y)
+void DepthOfFieldController::applyAstigmatismFocusPlane(float x, float y, float focusDeltaHalf, float& xAlignmentDelta, float& yAlignmentDelta)
 {
-	if(!_astigmatismEnabled || _astigmatismStrength <= FLT_EPSILON)
+	if(!_astigmatismEnabled || _astigmatismStrength <= FLT_EPSILON || fabsf(focusDeltaHalf) <= FLT_EPSILON)
 	{
+		xAlignmentDelta = x * -focusDeltaHalf;
+		yAlignmentDelta = y * focusDeltaHalf;
 		return;
 	}
 
-	const float angle = IGCS::Utils::degreesToRadians(_astigmatismRotation);
-	const float cosAngle = cosf(angle);
-	const float sinAngle = sinf(angle);
-
-	const float localX = (x * cosAngle) + (y * sinAngle);
-	const float localY = (-x * sinAngle) + (y * cosAngle);
-	const float compressedY = localY * (1.0f - _astigmatismStrength);
-
-	x = (localX * cosAngle) - (compressedY * sinAngle);
-	y = (localX * sinAngle) + (compressedY * cosAngle);
-}
-
-
-void DepthOfFieldController::applyAstigmatismFocusShift(float x, float y, float focusDeltaHalf, float& xAlignmentDelta, float& yAlignmentDelta)
-{
-	if(!_astigmatismEnabled || _astigmatismFocusShiftStrength <= FLT_EPSILON || fabsf(focusDeltaHalf) <= FLT_EPSILON)
-	{
-		return;
-	}
-
-	// Split the focus compensation between the two astigmatic axes around the
-	// normal focus plane: one axis focuses slightly nearer, the perpendicular
-	// axis slightly farther. This keeps the average focus position unchanged.
+	// Rotate the sample into the astigmatic frame. The two perpendicular axes
+	// receive opposite focus-plane offsets around the normal focus plane: one
+	// focuses nearer while the other focuses farther. Strength 0 is the original
+	// IGCS alignment; strength 1 gives 2x/0x focus compensation; values above 1
+	// intentionally exaggerate the split for strong lens-character effects.
 	const float angle = IGCS::Utils::degreesToRadians(_astigmatismRotation);
 	const float cosAngle = cosf(angle);
 	const float sinAngle = sinf(angle);
 	const float localX = (x * cosAngle) + (y * sinAngle);
 	const float localY = (-x * sinAngle) + (y * cosAngle);
-	const float halfStrength = 0.5f * _astigmatismFocusShiftStrength;
 
-	const float localShiftX = -localX * halfStrength;
-	const float localShiftY = localY * halfStrength;
-	const float worldShiftX = (localShiftX * cosAngle) - (localShiftY * sinAngle);
-	const float worldShiftY = (localShiftX * sinAngle) + (localShiftY * cosAngle);
+	const float nearAxisScale = 1.0f + _astigmatismStrength;
+	const float farAxisScale = 1.0f - _astigmatismStrength;
+	const float focusedLocalX = localX * nearAxisScale;
+	const float focusedLocalY = localY * farAxisScale;
 
-	// Keep the same X/Y sign convention used by the existing focus alignment.
-	xAlignmentDelta += -worldShiftX * focusDeltaHalf;
-	yAlignmentDelta += worldShiftY * focusDeltaHalf;
+	const float focusedX = (focusedLocalX * cosAngle) - (focusedLocalY * sinAngle);
+	const float focusedY = (focusedLocalX * sinAngle) + (focusedLocalY * cosAngle);
+
+	xAlignmentDelta = focusedX * -focusDeltaHalf;
+	yAlignmentDelta = focusedY * focusDeltaHalf;
 }
 
 
@@ -568,6 +574,7 @@ void DepthOfFieldController::createCircleDoFPoints()
 	float pointsOnRing = pointsFirstRing;
 	const float maxBokehRadius = _maxBokehSize / 2.0f;
 	const float focusDeltaHalf = _focusDelta / 2.0f;
+	const float anamorphicFactorToUse = _anamorphicEnabled ? _anamorphicFactor : 1.0f;
 	for(int ringNo = 1; ringNo <= _quality; ringNo++)
 	{
 		const float anglePerPoint = 6.28318530717958f / pointsOnRing;
@@ -577,14 +584,13 @@ void DepthOfFieldController::createCircleDoFPoints()
 		{
 			const float sinAngle = sin(angle);
 			const float cosAngle = cos(angle);
-			float x = ringDistance * cosAngle * _anamorphicFactor;
-			float y = ringDistance * sinAngle;
-			applyAstigmatism(x, y);
+			const float x = ringDistance * cosAngle * anamorphicFactorToUse;
+			const float y = ringDistance * sinAngle;
 			const float xDelta = maxBokehRadius * x;
 			const float yDelta = maxBokehRadius * y;
-			float xAlignmentDelta = x * -focusDeltaHalf;
-			float yAlignmentDelta = y * focusDeltaHalf;
-			applyAstigmatismFocusShift(x, y, focusDeltaHalf, xAlignmentDelta, yAlignmentDelta);
+			float xAlignmentDelta = 0.0f;
+			float yAlignmentDelta = 0.0f;
+			applyAstigmatismFocusPlane(x, y, focusDeltaHalf, xAlignmentDelta, yAlignmentDelta);
 
 			CameraLocation sample = {xDelta, yDelta, xAlignmentDelta, yAlignmentDelta, 1.0f, 1.0f, 1.0f};
 			applySphericalAberration(ringDistance, sample);
@@ -623,6 +629,7 @@ void DepthOfFieldController::createApertureShapedDoFPoints()
 	const float maxBokehRadius = _maxBokehSize / 2.0f;
 	const float focusDeltaHalf = _focusDelta / 2.0f;
 	const float anglePerVertex = 6.28318530717958f / (float)_apertureShapeSettings.NumberOfVertices;
+	const float anamorphicFactorToUse = _anamorphicEnabled ? _anamorphicFactor : 1.0f;
 	for(int ringNo = 1; ringNo <= _quality; ringNo++)
 	{
 		float vertexAngleForFringe = 0.0f;
@@ -652,15 +659,14 @@ void DepthOfFieldController::createApertureShapedDoFPoints()
 				const float xLinePoint = IGCS::Utils::lerp(xCurrentVertex, xNextVertex, pointStep);
 				const float yLinePoint = IGCS::Utils::lerp(yCurrentVertex, yNextVertex, pointStep);
 				float x = IGCS::Utils::lerp(xLinePoint, xRoundPoint, _apertureShapeSettings.RoundFactor);
-				float y = IGCS::Utils::lerp(yLinePoint, yRoundPoint, _apertureShapeSettings.RoundFactor);
+				const float y = IGCS::Utils::lerp(yLinePoint, yRoundPoint, _apertureShapeSettings.RoundFactor);
 				const float radiusNormalized = sqrtf(x * x + y * y);
-				x *= _anamorphicFactor;
-				applyAstigmatism(x, y);
+				x *= anamorphicFactorToUse;
 				const float xDelta = maxBokehRadius * x;
 				const float yDelta = maxBokehRadius * y;
-				float xAlignmentDelta = x * -focusDeltaHalf;
-				float yAlignmentDelta = y * focusDeltaHalf;
-				applyAstigmatismFocusShift(x, y, focusDeltaHalf, xAlignmentDelta, yAlignmentDelta);
+				float xAlignmentDelta = 0.0f;
+				float yAlignmentDelta = 0.0f;
+				applyAstigmatismFocusPlane(x, y, focusDeltaHalf, xAlignmentDelta, yAlignmentDelta);
 				CameraLocation sample = {xDelta, yDelta, xAlignmentDelta, yAlignmentDelta, 1.0f, 1.0f, 1.0f};
 				applySphericalAberration(radiusNormalized, sample);
 				applyFringe(ringDistance, pointAngleForFringe, sample);
