@@ -113,17 +113,17 @@ namespace IgcsDOF
 	uniform int SessionState < 
 		ui_type = "combo";
 		ui_min= 0; ui_max=1;
-		ui_items="Off\0SessionStart\0Setup\0Render\0Done\0";		// 0: done, 1: start, 2: setup, 3: render, 4: done
+		ui_items="Off\0SessionStart\0Setup\0Render\0Done\0";
 		ui_label = "Session state";
 		hidden=true;
 	> = 0;
 
 	uniform bool BlendFrame <
-		ui_label = "Blend frame";				// if true and state is render, the current framebuffer is blended with the temporary result.
+		ui_label = "Blend frame";
 		hidden=true;
 	> = false;
 	
-	uniform float BlendFactor < 				// Which is used as alpha for the current framebuffer to blend with the temporary result. 
+	uniform float BlendFactor <
 		ui_label = "Blend factor";
 		ui_type = "drag";
 		ui_min = 0.0f; ui_max = 1.0f;
@@ -131,7 +131,7 @@ namespace IgcsDOF
 		hidden=true;
 	> = 0.0f;
 	
-	uniform float2 AlignmentDelta <				// Which is used as alignment delta for the current framebuffer to determine with which pixel to blend with.
+	uniform float2 AlignmentDelta <
 		ui_type = "drag";
 		ui_step = 0.001;
 		ui_min = 0.000; ui_max = 1.000;
@@ -151,14 +151,14 @@ namespace IgcsDOF
 		hidden=true;
 	> = 2.0;
 	
-	uniform float2 MagnificationArea <				// Which is used as alignment delta for the current framebuffer to determine with which pixel to blend with.
+	uniform float2 MagnificationArea <
 		ui_type = "drag";
 		ui_step = 0.001;
 		ui_min = 0.01; ui_max = 1.000;
 		hidden=true;
 	> = float2(0.1f, 0.1f);
 
-	uniform float2 MagnificationLocationCenter <				// Which is used as alignment delta for the current framebuffer to determine with which pixel to blend with.
+	uniform float2 MagnificationLocationCenter <
 		ui_type = "drag";
 		ui_step = 0.001;
 		ui_min = 0.01; ui_max = 1.000;
@@ -189,6 +189,19 @@ namespace IgcsDOF
 	uniform bool CateyeVignette <		
 		hidden=true;
 	> = false;
+
+	uniform bool VignettingEnabled <
+		hidden=true;
+	> = false;
+	uniform float VignettingStart <
+		hidden=true;
+	> = 0.65;
+	uniform float VignettingEnd <
+		hidden=true;
+	> = 1.0;
+	uniform float VignettingStrength <
+		hidden=true;
+	> = 0.5;
 	
 #ifdef IGCS_DOF_DEBUG
 	uniform bool DBBool1<
@@ -238,15 +251,12 @@ namespace IgcsDOF
 
 	float3 AccentuateWhites(float3 fragment)
 	{
-		// apply small tow to the incoming fragment, so the whitepoint gets slightly lower than max.
-		// De-tonemap color (reinhard). Thanks Marty :) 
 		fragment = pow(abs(ConeOverlap(fragment)), HighlightGammaFactor);
 		return fragment / max((1.001 - (HighlightBoost * fragment)), 0.001);
 	}
 	
 	float3 CorrectForWhiteAccentuation(float3 fragment)
 	{
-		// Re-tonemap color (reinhard). Thanks Marty :)
 		float3 toReturn = fragment / (1.001 + (HighlightBoost * fragment));
 		return ConeOverlapInverse(pow(max(0, toReturn), 1.0 / HighlightGammaFactor)); 
 	}
@@ -257,8 +267,6 @@ namespace IgcsDOF
 		int2 gridStart = int2(uv);
 		float2 gridPos = frac(uv);
 
-		// manual bilinear interpolation to ramp colors into HDR first, then interpolating.
-		// Unfeasible if this is called many times, but for a single call, it's perfect
 		float4 weights = float4(gridPos, 1 - gridPos);
 		weights = weights.zxzx * weights.wwyy;
 
@@ -272,7 +280,7 @@ namespace IgcsDOF
 
 	float3 goldenDither(uint2 p)
 	{ 
-		uint2 umagic = uint2(3242174889u, 2447445413u); //1/phi, 1/phi² * 2^32, replaces frac() with a static precision method     
+		uint2 umagic = uint2(3242174889u, 2447445413u);
 		uint3 ret = p.x * umagic.x + p.y * umagic.y;
 		ret.y += (umagic.x + umagic.y) * 3u;
 		ret.z += (umagic.x + umagic.y) * 7u;
@@ -297,21 +305,19 @@ namespace IgcsDOF
 	{
 		float2 uv = (i.dispatchthreadid.xy + 0.5) * BUFFER_PIXEL_SIZE;
 		
-		if(SessionState <= 0 //idle, skip
-		|| SessionState >= 4 //done accumulating, skip
+		if(SessionState <= 0
+		|| SessionState >= 4
 		|| i.dispatchthreadid.x >= BUFFER_WIDTH || i.dispatchthreadid.y >= BUFFER_HEIGHT) 
 		{
 			return;
 		}
 		
-		//Start - backup framebuffer at default camera location
 		else if(SessionState == 1)
 		{
 			float3 color = tex2Dfetch(BackBufferPoint, i.dispatchthreadid.xy).rgb;
 			tex2Dstore(StorageBlendAccumulate, i.dispatchthreadid.xy, float4(color, 0));
 			return;
 		}
-		//Setup - blend the two camera locations and optionally show the magnifier
 		else if(SessionState == 2)
 		{
 			float2 shifted_uv = uv - float2(FocusDelta, 0);
@@ -325,7 +331,6 @@ namespace IgcsDOF
 		[branch]
 		if(BlendFrame)
 		{
-			//Stack frames
 			const float2 aspectRatio = float2(1, float(BUFFER_PIXEL_SIZE.y) / float(BUFFER_PIXEL_SIZE.x));
 			float2 uvToReadFrom = uv + AlignmentDelta.xy * aspectRatio;
 
@@ -338,30 +343,24 @@ namespace IgcsDOF
 
 			result.rgba = isInside ? result : 0.0;
 
-			//cateye bokeh
 			float2 normalizedOffset = AlignmentDelta.xy / FocusDelta * 2.0;
 			float2 cateyeOffset = uv * 2 - 1;
 			cateyeOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
-			cateyeOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1)); //adjust length such that length of 1 == vector to screen corner
+			cateyeOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1));
 
 			float distFromCenter = length(cateyeOffset);
 			cateyeOffset /= max(1e-6, distFromCenter);
 			
-			 // makes an area for falloff so we know where to apply the mask
             float catseyeFalloff = smoothstep(CateyeRadiusStart - 0.001, CateyeRadiusStart + 0.001, distFromCenter);
             float effectFactor = catseyeFalloff * step(0.001, abs(CateyeIntensity));
-            
-            // Calculate catseye effect strength
-            float cateyeStrength = linearstep(CateyeRadiusStart, CateyeRadiusEnd, distFromCenter) * sqrt(2.0) * CateyeIntensity; //negative value occludes discs from the other side
+            float cateyeStrength = linearstep(CateyeRadiusStart, CateyeRadiusEnd, distFromCenter) * sqrt(2.0) * CateyeIntensity;
 
             cateyeOffset *= cateyeStrength * effectFactor;
             normalizedOffset += cateyeOffset;
-            
-            // only apply the mask in the falloff
-            float cateyeMask = lerp(1.0, smoothstep(1.0, 0.98, length(normalizedOffset)), effectFactor); //tiny feather to avoid too harsh edges as cutting the neat bokeh sample pattern in half causes a jagged edge
+            float cateyeMask = lerp(1.0, smoothstep(1.0, 0.98, length(normalizedOffset)), effectFactor);
 			
 			result.rgb *= cateyeMask;
-			result.a *= CateyeVignette ? 1 : cateyeMask; //if we want to produce vignetting, don't multiply alpha such that the resulting image is divided by the full framecount
+			result.a *= CateyeVignette ? 1 : cateyeMask;
 			
 			if(BlendFactor < 0.75)
 			{
@@ -371,12 +370,11 @@ namespace IgcsDOF
 
 			tex2Dstore(StorageBlendAccumulate, i.dispatchthreadid.xy, result);
 
-			//We only need to update our output buffer when we changed the accumulator. This saves significant runtime overhead.			
 			result.rgb /= result.w; 
 			result.rgb = CorrectForWhiteAccentuation(result.rgb);
 			float3 dither = goldenDither(i.dispatchthreadid.xy);
-			dither *= 0.999; //slightly limit so we don't dither fully flat areas (which can happen with exactly +-0.5)
-			dither *= exp2(-8); //1.0/256.0. Using bitdepth here could lead to banding because windows wrongly reports 10 bit buffers on SDR setups while the buffer is in fact 8 bit. 
+			dither *= 0.999;
+			dither *= exp2(-8);
 			result.rgb = saturate(result.rgb + dither);
 			tex2Dstore(StorageDisplay, i.dispatchthreadid.xy, float4(result.rgb, 1));			
 		}
@@ -402,10 +400,19 @@ namespace IgcsDOF
 			float2 areaBottomRight = MagnificationLocationCenter + (MagnificationArea / 2.0f);
 			if(texcoord.x >= areaTopLeft.x && texcoord.y >= areaTopLeft.y && texcoord.x <= areaBottomRight.x && texcoord.y <= areaBottomRight.y)
 			{
-				// inside magnify area
 				float2 sourceCoord = ((texcoord - MagnificationLocationCenter) / MagnificationFactor) + MagnificationLocationCenter;
 				fragment = tex2Dlod(SamplerDisplay, float4(sourceCoord, 0, 0)).rgb;
 			}
+		}
+
+		if(VignettingEnabled)
+		{
+			float2 vignetteOffset = texcoord * 2.0 - 1.0;
+			vignetteOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+			vignetteOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1.0));
+			float vignetteDistance = length(vignetteOffset);
+			float vignetteAmount = smoothstep(VignettingStart, VignettingEnd, vignetteDistance) * VignettingStrength;
+			fragment *= 1.0 - saturate(vignetteAmount);
 		}
 	}
 
@@ -423,6 +430,6 @@ namespace IgcsDOF
 #endif
 	{
 		pass { ComputeShader = IGCSCS<32, 32>;DispatchSizeX = CEIL_DIV(BUFFER_WIDTH, 32);DispatchSizeY = CEIL_DIV(BUFFER_HEIGHT, 32); }
-		pass { VertexShader = VS_Output; PixelShader = PS_Output; }		// to show the buffer written by the compute shader.  
+		pass { VertexShader = VS_Output; PixelShader = PS_Output; }
 	}
 }
