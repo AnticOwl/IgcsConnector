@@ -48,9 +48,6 @@
 
 class DepthOfFieldController
 {
-	/// <summary>
-	/// A location definition for the camera to step to. It contains the step info as well as the alignment information for the shader.
-	/// </summary>
 	struct CameraLocation
 	{
 		float xDelta = 0.0f;
@@ -84,73 +81,23 @@ public:
 
 	DepthOfFieldControllerState getState() { return _state; }
 
-	/// <summary>
-	/// Sets the max bokeh size. This controls the value 'B' in the design which is the maximum diameter of the bokeh circles and 2x the max step the camera will traverse. In world units of the engine.
-	/// </summary>
-	/// <param name="newValue"></param>
 	void setMaxBokehSize(reshade::api::effect_runtime* runtime, float newValue);
-	/// <summary>
-	/// Sets the focus delta. This controls value 'A' in the design which is the percentage the pixels which have to be in focus have moved over MaxBokehSize.
-	///	This value is used to realign the image when the camera steps a factor of MaxBokehSize.
-	/// </summary>
 	void setXFocusDelta(reshade::api::effect_runtime* runtime, float newValueX);
-	/// <summary>
-	/// Starts a new session. 
-	/// </summary>
 	void startSession(reshade::api::effect_runtime* runtime);
-	/// <summary>
-	/// Ends the current session in progress
-	/// </summary>
 	void endSession(reshade::api::effect_runtime* runtime);
-	/// <summary>
-	/// Called when the present method is called but before reshade effects are rendered. 
-	/// </summary>
-	/// <param name="runtime"></param>
 	void reshadeBeginEffectsCalled(reshade::api::effect_runtime* runtime);
-	/// <summary>
-	/// Called when all the reshade effects have been handled and have run.
-	/// </summary>
-	/// <param name="runtime"></param>
 	void reshadeFinishEffectsCalled(reshade::api::effect_runtime* runtime);
-	/// <summary>
-	/// Starts the render of the final image
-	/// </summary>
-	/// <param name="runtime"></param>
 	void startRender(reshade::api::effect_runtime* runtime);
-	/// <summary>
-	/// Migrates the grabbed reshade state to the new one passed in. Occurs when the user reloads the reshade preset or the viewport got resized
-	/// </summary>
-	/// <param name="runtime">Can be empty, in which case it's ignored</param>
 	void migrateReshadeState(reshade::api::effect_runtime* runtime);
-	/// <summary>
-	/// Calculates the set of points in the shape to use
-	/// </summary>
 	void calculateShapePoints();
-	/// <summary>
-	/// Renders the overlay which contains the progress bar
-	/// </summary>
 	void renderOverlay();
-	/// <summary>
-	/// Draws the created camera steps as points on the drawList specified
-	/// </summary>
-	/// <param name="drawList"></param>
-	/// <param name="topLeftScreenCoord"></param>
-	/// <param name="canvasWidthHeight"></param>
 	void drawShape(ImDrawList* drawList, ImVec2 topLeftScreenCoord, float canvasWidthHeight);
-	/// <summary>
-	/// Renders a progress bar at the current ImGui location, which can be in the settings or in an overlay.
-	/// </summary>
 	void renderProgressBar();
-	/// <summary>
-	/// Writes a set of member variables to the shader's uniforms using the reshade runtime specified, so the shader can use the values.
-	/// </summary>
-	/// <param name="runtime"></param>
 	void writeVariableStateToShader(reshade::api::effect_runtime* runtime);
 	void loadIniFileData(CDataFile& iniFile);
 	void saveIniFileData(CDataFile& iniFile);
 	void invalidateShapePoints() { calculateShapePoints(); }
 
-	// setters
 	void setNumberOfFramesToWaitPerFrame(int newValue) { _numberOfFramesToWait = IGCS::Utils::clampEx(newValue, 0, 20); }
 	void setNumberOfFramesInFlight(int newValue) { _numberOfFramesInFlight = IGCS::Utils::clampEx(newValue, 0, 20); }
 	void setFrameWaitType(DepthOfFieldFrameWaitType newValue)
@@ -159,7 +106,6 @@ public:
 		switch(_frameWaitType)
 		{
 			case DepthOfFieldFrameWaitType::Fast:
-				// moving from classic to fl
 				_numberOfFramesInFlight = _numberOfFramesToWait;
 				_numberOfFramesToWait = 0;
 				break;
@@ -201,6 +147,11 @@ public:
 	void setAstigmatismStrength(float newValue)
 	{
 		_astigmatismStrength = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f);
+		calculateShapePoints();
+	}
+	void setAstigmatismFocusShiftStrength(float newValue)
+	{
+		_astigmatismFocusShiftStrength = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f);
 		calculateShapePoints();
 	}
 	void setAstigmatismRotation(float newValue)
@@ -250,10 +201,9 @@ public:
 	}
 	void setHighlightBoostFactor(float newValue) { _highlightBoostFactor = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
 	void setHighlightGammaFactor(float newValue) { _highlightGammaFactor = IGCS::Utils::clampEx(newValue, 0.1f, 5.0f); }
-	void setRenderPaused(bool newValue)	{ _renderPaused = newValue;	}
+	void setRenderPaused(bool newValue) { _renderPaused = newValue; }
 	void setShowProgressBarAsOverlay(bool newValue) { _showProgressBarAsOverlay = newValue; }
 
-	// getters
 	DepthOfFieldRenderOrder getRenderOrder() { return _renderOrder; }
 	float getMaxBokehSize() { return _maxBokehSize; }
 	float getXFocusDelta() { return _focusDelta; }
@@ -270,6 +220,7 @@ public:
 	float getAnamorphicFactor() { return _anamorphicFactor; }
 	bool getAstigmatismEnabled() { return _astigmatismEnabled; }
 	float getAstigmatismStrength() { return _astigmatismStrength; }
+	float getAstigmatismFocusShiftStrength() { return _astigmatismFocusShiftStrength; }
 	float getAstigmatismRotation() { return _astigmatismRotation; }
 	float getRingAngleOffset() { return _ringAngleOffset; }
 	float getSphericalAberrationDimFactor() { return _sphericalAberrationDimFactor; }
@@ -284,8 +235,8 @@ public:
 	float getCatEyeBokehIntensity() { return _catEyeBokehIntensity; }
 	bool getAddCatEyeVignette() { return _addCatEyeVignette; }
 
-	MagnifierSettings& getMagnifierSettings() { return _magnificationSettings; }				// this is a bit dirty...
-	ApertureShapeSettings& getApertureShapeSettings() { return _apertureShapeSettings; }		// same
+	MagnifierSettings& getMagnifierSettings() { return _magnificationSettings; }
+	ApertureShapeSettings& getApertureShapeSettings() { return _apertureShapeSettings; }
 
 	void setDebugBool1(bool newVal) { _debugBool1 = newVal; }
 	void setDebugBool2(bool newVal) { _debugBool2 = newVal; }
@@ -304,50 +255,19 @@ private:
 	void loadFloatFromIni(CDataFile& iniFile, const std::string& key, float* toWriteTo);
 	void loadIntFromIni(CDataFile& iniFile, const std::string& key, int* toWriteTo);
 	void loadBoolFromIni(CDataFile& iniFile, const std::string& key, bool* toWriteTo, bool defaultValue);
-	/// <summary>
-	/// Create a set of circular points using nested circles, which are used to build the camera steps array
-	/// </summary>
 	void createCircleDoFPoints();
 	void applyRenderOrder();
 	void renormalizeBokehWeights();
 	void createApertureShapedDoFPoints();
 	void applyAstigmatism(float& x, float& y);
+	void applyAstigmatismFocusShift(float x, float y, float focusDeltaHalf, float& xAlignmentDelta, float& yAlignmentDelta);
 
 	void displayScreenshotSessionStartError(const ScreenshotSessionStartReturnCode sessionStartResult);
-	/// <summary>
-	/// Method called after the game has rendered a frame but before reshade will render the reshade effects (and thus our shader)
-	/// </summary>
 	void handlePresentBeforeReshadeEffects();
-	/// <summary>
-	/// Method called after the game has rendered a frame and after reshade has rendered the reshade effects (and thus our shader)
-	/// </summary>
 	void handlePresentAfterReshadeEffects();
-	/// <summary>
-	/// Modifies the sample weight for the camera steps to produce spherical aberration based on radius from center
-	/// </summary>
-	/// <param name="radiusNormalized"></param>
-	/// <param name="sample"></param>
-	/// <returns></returns>
 	void applySphericalAberration(float radiusNormalized, CameraLocation& sample);
-	/// <summary>
-	/// Calculates the factor of the bokeh disc outline (fringe)
-	/// </summary>
-	/// <param name="ringRadiusNormalized"></param>
-	/// <param name="sampleAngle"></param>
-	/// <param name="sample"></param>
-	/// <returns></returns>
 	void applyFringe(float ringRadiusNormalized, float sampleAngle, CameraLocation& sample);
-	/// <summary>
-	/// Method which will setup the frame for blending, moving the camera, configuring the shader.
-	/// </summary>
 	void performRenderFrameSetupWork();
-	/// <summary>
-	/// Calculates a dim factor for red/green/blue for a segment (1/3rd of the space has one channel be more prominent, the others are dimmed with this factor)
-	/// </summary>
-	/// <param name="angleSegment"></param>
-	/// <param name="segmentAngleMin"></param>
-	/// <param name="numberOfSegments"></param>
-	/// <returns></returns>
 	float calculateChannelDimFactor(float angleSegment, float segmentAngleMin, int numberOfSegments);
 
 	bool isReshadeStateEmpty()
@@ -360,17 +280,17 @@ private:
 	DepthOfFieldControllerState _state;
 	std::vector<CameraLocation> _cameraSteps;
 
-	std::function<void(reshade::api::effect_runtime*)>  _onPresentWorkFunc = nullptr;			// if set, this function is called when the onPresentWork counter reaches 0.
+	std::function<void(reshade::api::effect_runtime*)> _onPresentWorkFunc = nullptr;
 
-	float _maxBokehSize = 0.25;			// value 'B', so the max diameter of a circle we're going to walk. In world units of the engine
-	float _focusDelta = 0.0f;			// value 'A', the relationship between stepping over maxBokehSize and the movement of the pixels that have to be in focus. X specific
-	bool _blendFrame = false;			// if true, the shader will blend the curreent frame if state is Render
-	float _blendFactor = 0.0f;			// for the shader, the blend factor to use when blending a frame
-	float _xAlignmentDelta = 0.0f;		// for the shader, the alignment x delta to use
-	float _yAlignmentDelta = 0.0f;		// for the shader, the alignment y delta to use
+	float _maxBokehSize = 0.25;
+	float _focusDelta = 0.0f;
+	bool _blendFrame = false;
+	float _blendFactor = 0.0f;
+	float _xAlignmentDelta = 0.0f;
+	float _yAlignmentDelta = 0.0f;
 	float _highlightBoostFactor = 0.9f;
 	float _highlightGammaFactor = 2.2f;
-	float _sphericalAberrationDimFactor = 0.5f; //dim factor as intensity, 0% to 100% for center sample
+	float _sphericalAberrationDimFactor = 0.5f;
 	float _fringeIntensity = 0.0f;
 	float _fringeWidth = 0.1f;
 	float _caStrength = 0.0f;
@@ -384,27 +304,28 @@ private:
 
 	MagnifierSettings _magnificationSettings;
 
-	int _onPresentWorkCounter = 0;		// if 0, reshadeBeginEffectsCalled will call onPresentWorkFunc (if set), otherwise this counter is decreased.
+	int _onPresentWorkCounter = 0;
 
 	DepthOfFieldBlurType _blurType = DepthOfFieldBlurType::Circular;
 	DepthOfFieldRenderFrameState _renderFrameState = DepthOfFieldRenderFrameState::Off;
-	int _frameWaitCounter = 0;	// When 0 move the frameblend state to the next state, otherwise decrease
-	int _currentStepFrame = -1;		// < 0: no frame, >= 0 the current frame data to step the camera to, 0 based.
-	int _currentBlendFrame = -1;	// < 0: no frame, >= 0 the current frame data to blend, 0 based.
-	int _stepCounter = 0;			// used to determine when to step
-	int _blendCounter = 0;			// used to determine when to blend
+	int _frameWaitCounter = 0;
+	int _currentStepFrame = -1;
+	int _currentBlendFrame = -1;
+	int _stepCounter = 0;
+	int _blendCounter = 0;
 	bool _renderPaused = false;
 
 	int _numberOfFramesToRender = 0;
-	int _numberOfFramesToWait = 0;			// default for fast is 0. For classic it's 1, but we'll set it to a proper value when the value is set. 
-	int _numberOfFramesInFlight = 1;		// default for fast is 1, classic doesn't use this. 
-	int _quality;		// # of circles
+	int _numberOfFramesToWait = 0;
+	int _numberOfFramesInFlight = 1;
+	int _quality;
 	int _numberOfPointsInnermostRing;
 	float _ringAngleOffset = 0.0f;
 	float _anamorphicFactor = 1.0f;
 	bool _astigmatismEnabled = false;
 	float _astigmatismStrength = 0.0f;
-	float _astigmatismRotation = 0.0f;	// major-axis rotation in degrees, 0..180
+	float _astigmatismFocusShiftStrength = 0.0f;
+	float _astigmatismRotation = 0.0f;
 	DepthOfFieldRenderOrder _renderOrder = DepthOfFieldRenderOrder::InnerRingToOuterRing;
 	bool _showProgressBarAsOverlay = true;
 	ApertureShapeSettings _apertureShapeSettings;
