@@ -134,6 +134,11 @@ public:
 		_blurType = newValue;
 		calculateShapePoints();
 	}
+	void setAnamorphicEnabled(bool newValue)
+	{
+		_anamorphicEnabled = newValue;
+		calculateShapePoints();
+	}
 	void setAnamorphicFactor(float newValue)
 	{
 		_anamorphicFactor = IGCS::Utils::clampEx(newValue, 0.01f, 1.0f);
@@ -146,12 +151,7 @@ public:
 	}
 	void setAstigmatismStrength(float newValue)
 	{
-		_astigmatismStrength = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f);
-		calculateShapePoints();
-	}
-	void setAstigmatismFocusShiftStrength(float newValue)
-	{
-		_astigmatismFocusShiftStrength = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f);
+		_astigmatismStrength = IGCS::Utils::clampEx(newValue, 0.0f, 3.0f);
 		calculateShapePoints();
 	}
 	void setAstigmatismRotation(float newValue)
@@ -159,6 +159,24 @@ public:
 		_astigmatismRotation = IGCS::Utils::clampEx(newValue, 0.0f, 180.0f);
 		calculateShapePoints();
 	}
+	void setVignettingEnabled(bool newValue) { _vignettingEnabled = newValue; }
+	void setVignettingStart(float newValue)
+	{
+		_vignettingStart = IGCS::Utils::clampEx(newValue, 0.0f, 0.999f);
+		if(_vignettingEnd <= _vignettingStart)
+		{
+			_vignettingEnd = std::min(1.0f, _vignettingStart + 0.001f);
+		}
+	}
+	void setVignettingEnd(float newValue)
+	{
+		_vignettingEnd = IGCS::Utils::clampEx(newValue, 0.001f, 1.0f);
+		if(_vignettingEnd <= _vignettingStart)
+		{
+			_vignettingStart = std::max(0.0f, _vignettingEnd - 0.001f);
+		}
+	}
+	void setVignettingStrength(float newValue) { _vignettingStrength = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
 	void setRingAngleOffset(float newValue)
 	{
 		_ringAngleOffset = IGCS::Utils::clampEx(newValue, -2.0f, 2.0f);
@@ -217,11 +235,15 @@ public:
 	bool getRenderPaused() { return _renderPaused; }
 	int getTotalNumberOfStepsToTake() { return _cameraSteps.size(); }
 	bool getShowProgressBarAsOverlay() { return _showProgressBarAsOverlay; }
+	bool getAnamorphicEnabled() { return _anamorphicEnabled; }
 	float getAnamorphicFactor() { return _anamorphicFactor; }
 	bool getAstigmatismEnabled() { return _astigmatismEnabled; }
 	float getAstigmatismStrength() { return _astigmatismStrength; }
-	float getAstigmatismFocusShiftStrength() { return _astigmatismFocusShiftStrength; }
 	float getAstigmatismRotation() { return _astigmatismRotation; }
+	bool getVignettingEnabled() { return _vignettingEnabled; }
+	float getVignettingStart() { return _vignettingStart; }
+	float getVignettingEnd() { return _vignettingEnd; }
+	float getVignettingStrength() { return _vignettingStrength; }
 	float getRingAngleOffset() { return _ringAngleOffset; }
 	float getSphericalAberrationDimFactor() { return _sphericalAberrationDimFactor; }
 	float getFringeIntensity() { return _fringeIntensity; }
@@ -259,8 +281,7 @@ private:
 	void applyRenderOrder();
 	void renormalizeBokehWeights();
 	void createApertureShapedDoFPoints();
-	void applyAstigmatism(float& x, float& y);
-	void applyAstigmatismFocusShift(float x, float y, float focusDeltaHalf, float& xAlignmentDelta, float& yAlignmentDelta);
+	void applyAstigmatismFocusPlane(float x, float y, float focusDeltaHalf, float& xAlignmentDelta, float& yAlignmentDelta);
 
 	void displayScreenshotSessionStartError(const ScreenshotSessionStartReturnCode sessionStartResult);
 	void handlePresentBeforeReshadeEffects();
@@ -321,11 +342,15 @@ private:
 	int _quality;
 	int _numberOfPointsInnermostRing;
 	float _ringAngleOffset = 0.0f;
+	bool _anamorphicEnabled = true;
 	float _anamorphicFactor = 1.0f;
 	bool _astigmatismEnabled = false;
 	float _astigmatismStrength = 0.0f;
-	float _astigmatismFocusShiftStrength = 0.0f;
 	float _astigmatismRotation = 0.0f;
+	bool _vignettingEnabled = false;
+	float _vignettingStart = 0.65f;
+	float _vignettingEnd = 1.0f;
+	float _vignettingStrength = 0.5f;
 	DepthOfFieldRenderOrder _renderOrder = DepthOfFieldRenderOrder::InnerRingToOuterRing;
 	bool _showProgressBarAsOverlay = true;
 	ApertureShapeSettings _apertureShapeSettings;
