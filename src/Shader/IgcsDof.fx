@@ -535,8 +535,9 @@ namespace IgcsDOF
 				float pupilDistance = length(pupilSample + fieldDirection * pupilShift);
 				float pupilMask = 1.0 - smoothstep(1.0, 1.04, pupilDistance);
 
+				// Keep alpha untouched here: pupil occlusion must reduce light while the
+				// sample weight remains unchanged, otherwise normalization cancels it out.
 				result.rgb *= pupilMask;
-				result.a *= pupilMask;
 			}
 			
 			if(BlendFactor < 0.75)
