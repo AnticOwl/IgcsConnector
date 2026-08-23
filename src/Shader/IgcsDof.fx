@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test6-vignetting-center"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test5-true-two-pass"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -152,7 +152,7 @@ namespace IgcsDOF
 	uniform bool VignettingShowGuide <
 		ui_category = "Vignetting (TEST)";
 		ui_label = "Show center / radius guide";
-		ui_tooltip = "Shows the vignetting center as a H/V cross plus the start and end radii during DOF setup.";
+		ui_tooltip = "Shows a crosshair at the vignetting center plus the start and end radii during DOF setup.";
 	> = true;
 
 	uniform float VignettingCenterX <
@@ -422,11 +422,11 @@ namespace IgcsDOF
 
 	float vignettingRadius01(float2 uv)
 	{
-		float2 p = (uv - float2(VignettingCenterX, VignettingCenterY)) * 2.0;
 		const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
-		p.y /= screenAspect;
-		p /= length(float2(rcp(screenAspect), 1.0));
-		return length(p);
+		float2 p = uv - float2(VignettingCenterX, VignettingCenterY);
+		p.x *= screenAspect;
+		const float maxRadius = 0.5 * sqrt(screenAspect * screenAspect + 1.0);
+		return length(p) / max(maxRadius, 1e-5);
 	}
 
 	float2 applyLensDistortion(float2 uv)
@@ -533,7 +533,8 @@ namespace IgcsDOF
 			result.rgb *= float3(SampleWeightR, SampleWeightG, SampleWeightB);
 
 			float focusDeltaSafe = abs(FocusDelta) > 1e-6 ? FocusDelta : (FocusDelta < 0.0 ? -1e-6 : 1e-6);
-			float2 normalizedOffset = alignmentToUse / focusDeltaSafe * 2.0;
+			float2 apertureSample = alignmentToUse / focusDeltaSafe * 2.0;
+			float2 normalizedOffset = apertureSample;
 			float2 cateyeOffset = warpedUv * 2 - 1;
 			cateyeOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
 			cateyeOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1));
@@ -552,23 +553,24 @@ namespace IgcsDOF
 			result.rgb *= cateyeMask;
 			result.a *= CateyeVignette ? 1 : cateyeMask;
 
-			if(VignettingEnabled && VignettingStrength > 0.0001)
+			// Preserve the validated c250edde render-time pupil vignetting model.
+			// Only the optical center is made movable here.
+			if(VignettingEnabled)
 			{
-				float2 fieldOffset = (warpedUv - float2(VignettingCenterX, VignettingCenterY)) * 2.0;
-				fieldOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
-				fieldOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1.0));
-				float fieldRadius = length(fieldOffset);
+				float2 lensOffset = (warpedUv - float2(VignettingCenterX, VignettingCenterY)) * 2.0;
+				lensOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+				lensOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1.0));
 
-				float edgeProgress = smoothstep(VignettingStart, VignettingEnd, fieldRadius);
-				float2 fieldDirection = fieldOffset / max(fieldRadius, 1e-5);
-				float2 pupilSample = alignmentToUse / max(abs(FocusDelta), 1e-5) * 2.0;
-				float pupilShift = edgeProgress * VignettingStrength;
-				float pupilDistance = length(pupilSample + fieldDirection * pupilShift);
-				float pupilMask = 1.0 - smoothstep(1.0, 1.04, pupilDistance);
+				float vignetteRadius = length(lensOffset);
+				float2 radialDirection = vignetteRadius > 1e-6 ? lensOffset / vignetteRadius : float2(0.0, 0.0);
+				float vignetteFalloff = linearstep(VignettingStart, VignettingEnd, vignetteRadius);
+				float pupilShift = vignetteFalloff * VignettingStrength * sqrt(2.0);
+				float2 vignetteSample = apertureSample + radialDirection * pupilShift;
+				float vignetteMask = smoothstep(1.0, 0.98, length(vignetteSample));
 
-				// Keep alpha untouched here: pupil occlusion must reduce light while the
-				// sample weight remains unchanged, otherwise normalization cancels it out.
-				result.rgb *= pupilMask;
+				// Keep alpha untouched: rejected lens samples contribute less light instead of
+				// being renormalized away. This makes the vignetting part of the DOF exposure.
+				result.rgb *= vignetteMask;
 			}
 			
 			if(BlendFactor < 0.75)
@@ -642,31 +644,31 @@ namespace IgcsDOF
 			}
 		}
 
-		if(SessionState==2 && VignettingEnabled && VignettingShowGuide)
+		if(SessionState==2 && VignettingShowGuide)
 		{
 			const float2 center = float2(VignettingCenterX, VignettingCenterY);
 			const float radius01 = vignettingRadius01(texcoord);
 			const float px = BUFFER_PIXEL_SIZE.x;
 			const float py = BUFFER_PIXEL_SIZE.y;
-			const float crossHalfX = 28.0 * px;
-			const float crossHalfY = 28.0 * py;
+			const float crossHalfX = 22.0 * px;
+			const float crossHalfY = 22.0 * py;
 			const bool crossV = abs(texcoord.x - center.x) <= 1.5 * px && abs(texcoord.y - center.y) <= crossHalfY;
 			const bool crossH = abs(texcoord.y - center.y) <= 1.5 * py && abs(texcoord.x - center.x) <= crossHalfX;
-			const float ringThickness = 0.0040;
+			const float ringThickness = 0.0035;
 			const bool onStartRing = abs(radius01 - VignettingStart) <= ringThickness;
 			const bool onEndRing = abs(radius01 - VignettingEnd) <= ringThickness;
 
 			if(onEndRing)
 			{
-				fragment = lerp(fragment, float3(0.95, 0.25, 0.95), 0.85);
+				fragment = lerp(fragment, float3(0.95, 0.20, 0.85), 0.85);
 			}
 			if(onStartRing)
 			{
-				fragment = lerp(fragment, float3(0.70, 0.45, 1.0), 0.90);
+				fragment = lerp(fragment, float3(0.85, 0.75, 0.20), 0.90);
 			}
 			if(crossV || crossH)
 			{
-				fragment = lerp(fragment, float3(0.95, 0.75, 1.0), 0.95);
+				fragment = lerp(fragment, float3(0.25, 1.0, 0.45), 0.95);
 			}
 		}
 	}
