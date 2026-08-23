@@ -40,10 +40,14 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test1"
 	
 // #define IGCS_DOF_DEBUG	
 	
+	// ------------------------------
+	// Visible values
+	// ------------------------------
+						
 	uniform float SetupAlpha <
 		ui_label = "Setup alpha";
 		ui_type = "drag";
@@ -51,6 +55,36 @@ namespace IgcsDOF
 		ui_step = 0.001;
 	> = 0.5;
 
+	// First-pass prototype controls. These stay visible in the shader UI for
+	// validation; once the focus-plane math is validated they move to the addon UI.
+	uniform bool TiltedFocusPlaneEnabled <
+		ui_category = "Tilted Focus Plane (TEST)";
+		ui_label = "Enable tilted focus plane";
+		ui_tooltip = "Tilts the focus plane around the normal focus pivot. The pivot itself remains unchanged.";
+	> = false;
+
+	uniform float TiltedFocusPlaneAngle <
+		ui_category = "Tilted Focus Plane (TEST)";
+		ui_label = "Tilt angle";
+		ui_type = "drag";
+		ui_min = -45.0; ui_max = 45.0;
+		ui_step = 0.1;
+		ui_tooltip = "Signed tilt angle in degrees. 0 keeps the original parallel focus plane.";
+	> = 0.0;
+
+	uniform float TiltedFocusPlaneRotation <
+		ui_category = "Tilted Focus Plane (TEST)";
+		ui_label = "Tilt rotation";
+		ui_type = "drag";
+		ui_min = 0.0; ui_max = 180.0;
+		ui_step = 0.1;
+		ui_tooltip = "Direction of the focus-depth gradient. 0 degrees = left/right, 90 degrees = top/bottom.";
+	> = 0.0;
+
+	// ------------------------------
+	// Hidden values, set by the connector
+	// ------------------------------
+	
 	uniform float HighlightBoost <
 		ui_category = "Highlight tweaking";
 		ui_label="Highlight boost factor";
@@ -196,9 +230,15 @@ namespace IgcsDOF
 	> = 0.5;
 	
 #ifdef IGCS_DOF_DEBUG
-	uniform bool DBBool1<ui_label = "DBG Bool1";> =false;
-	uniform bool DBBool2<ui_label = "DBG Bool2";> =false;
-	uniform bool DBBool3<ui_label = "DBG Bool3";> =false;
+	uniform bool DBBool1<
+		ui_label = "DBG Bool1";
+	> =false;
+	uniform bool DBBool2<
+		ui_label = "DBG Bool2";
+	> =false;
+	uniform bool DBBool3<
+		ui_label = "DBG Bool3";
+	> =false;
 #endif
 
 #ifndef BUFFER_PIXEL_SIZE
@@ -210,14 +250,14 @@ namespace IgcsDOF
 
 	#define CEIL_DIV(num, denom) ((((num) - 1) / (denom)) + 1)
 
-	sampler BackBufferPoint { Texture = ReShade::BackBufferTex; MagFilter = POINT; MinFilter = POINT; MipFilter = POINT; AddressU = CLAMP; AddressV = CLAMP; AddressW = CLAMP; };
-	texture texBlendAccumulate { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA32F; };
-	sampler SamplerBlendAccumulate { Texture = texBlendAccumulate; MagFilter = POINT; MinFilter = POINT; MipFilter = POINT; };
-	storage StorageBlendAccumulate { Texture = texBlendAccumulate; };
+	sampler BackBufferPoint			{ Texture = ReShade::BackBufferTex; MagFilter = POINT; MinFilter = POINT; MipFilter = POINT; AddressU = CLAMP; AddressV = CLAMP; AddressW = CLAMP; };
+	texture texBlendAccumulate 		{ Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA32F; };
+	sampler SamplerBlendAccumulate	{ Texture = texBlendAccumulate; MagFilter = POINT; MinFilter = POINT; MipFilter = POINT; };
+	storage StorageBlendAccumulate  { Texture = texBlendAccumulate;  };
 
-	texture texDisplay { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGB10A2; };
-	sampler SamplerDisplay { Texture = texDisplay; MagFilter = POINT; MinFilter = POINT; MipFilter = POINT;};
-	storage StorageDisplay { Texture = texDisplay; };
+	texture texDisplay 		{ Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGB10A2; };
+	sampler SamplerDisplay	{ Texture = texDisplay;  MagFilter = POINT; MinFilter = POINT; MipFilter = POINT;};
+	storage StorageDisplay  { Texture = texDisplay;  };
 	
 	float3 ConeOverlap(float3 fragment)
 	{
@@ -278,22 +318,55 @@ namespace IgcsDOF
 		return saturate((x - lo) / (hi - lo));
 	}
 
+	// Projective first-pass model for a focus plane which pivots around the
+	// original focus reference. At the image centre signedPosition is zero, so
+	// the exact original alignment is preserved. One side receives a larger
+	// alignment and the opposite side a smaller alignment, producing a depth
+	// gradient rather than translating the focus reference itself.
+	float2 applyTiltedFocusPlane(float2 uv, float2 alignment)
+	{
+		if(!TiltedFocusPlaneEnabled || abs(TiltedFocusPlaneAngle) < 0.0001)
+		{
+			return alignment;
+		}
+
+		float2 planePosition = uv * 2.0 - 1.0;
+		const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+		planePosition.y /= screenAspect;
+		planePosition /= length(float2(rcp(screenAspect), 1.0));
+
+		const float rotationRadians = radians(TiltedFocusPlaneRotation);
+		const float2 depthGradientAxis = float2(cos(rotationRadians), sin(rotationRadians));
+		const float signedPosition = dot(planePosition, depthGradientAxis);
+		const float tiltSlope = tan(radians(TiltedFocusPlaneAngle));
+
+		// A projective scale is closer to a tilted plane than a linear offset and
+		// keeps the centre/pivot exactly unchanged. Clamp only prevents a singular
+		// projection at intentionally extreme test settings.
+		const float denominator = max(0.15, 1.0 + (signedPosition * tiltSlope));
+		return alignment / denominator;
+	}
+
 	struct CSIN 
 	{
-		uint3 groupthreadid : SV_GroupThreadID;         
-		uint3 groupid : SV_GroupID;            
-		uint3 dispatchthreadid : SV_DispatchThreadID;     
-		uint threadid : SV_GroupIndex;
+		uint3 groupthreadid     : SV_GroupThreadID;         
+		uint3 groupid           : SV_GroupID;            
+		uint3 dispatchthreadid  : SV_DispatchThreadID;     
+		uint threadid           : SV_GroupIndex;
 	};
+
 
 	void IGCSCS(in CSIN i)
 	{
 		float2 uv = (i.dispatchthreadid.xy + 0.5) * BUFFER_PIXEL_SIZE;
 		
-		if(SessionState <= 0 || SessionState >= 4 || i.dispatchthreadid.x >= BUFFER_WIDTH || i.dispatchthreadid.y >= BUFFER_HEIGHT) 
+		if(SessionState <= 0
+		|| SessionState >= 4
+		|| i.dispatchthreadid.x >= BUFFER_WIDTH || i.dispatchthreadid.y >= BUFFER_HEIGHT) 
 		{
 			return;
 		}
+		
 		else if(SessionState == 1)
 		{
 			float3 color = tex2Dfetch(BackBufferPoint, i.dispatchthreadid.xy).rgb;
@@ -302,9 +375,10 @@ namespace IgcsDOF
 		}
 		else if(SessionState == 2)
 		{
-			float2 shifted_uv = uv - float2(FocusDelta, 0);
+			float2 setupAlignment = applyTiltedFocusPlane(uv, float2(FocusDelta, 0.0));
+			float2 shifted_uv = uv - setupAlignment;
 			float3 currentFragment = tex2Dlod(ReShade::BackBuffer, float4(shifted_uv, 0, 0)).rgb;
-			float3 cachedFragment = tex2Dfetch(StorageBlendAccumulate, i.dispatchthreadid.xy).rgb;
+			float3 cachedFragment  = tex2Dfetch(StorageBlendAccumulate, i.dispatchthreadid.xy).rgb;
 			float3 fragment = lerp(cachedFragment, currentFragment, SetupAlpha);
 			tex2Dstore(StorageDisplay, i.dispatchthreadid.xy, float4(fragment, 1));
 			return;
@@ -314,48 +388,60 @@ namespace IgcsDOF
 		if(BlendFrame)
 		{
 			const float2 aspectRatio = float2(1, float(BUFFER_PIXEL_SIZE.y) / float(BUFFER_PIXEL_SIZE.x));
-			float2 uvToReadFrom = uv + AlignmentDelta.xy * aspectRatio;
-			bool isInside = all(saturate(uvToReadFrom - uvToReadFrom * uvToReadFrom));
+			float2 alignmentToUse = applyTiltedFocusPlane(uv, AlignmentDelta.xy);
+			float2 uvToReadFrom = uv + alignmentToUse * aspectRatio;
+
+			bool isInside = all(saturate(uvToReadFrom - uvToReadFrom*uvToReadFrom));
 
 			float4 result;
 			result.rgb = ReadHDRInput(uvToReadFrom);
 			result.rgb *= float3(SampleWeightR, SampleWeightG, SampleWeightB);
 			result.a = 1.0;
+
 			result.rgba = isInside ? result : 0.0;
 
-			float focusDeltaSafe = abs(FocusDelta) > 1e-6 ? FocusDelta : (FocusDelta < 0.0 ? -1e-6 : 1e-6);
-			float2 apertureSample = AlignmentDelta.xy / focusDeltaSafe * 2.0;
-			float2 normalizedOffset = apertureSample;
-			float2 lensOffset = uv * 2.0 - 1.0;
-			lensOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
-			lensOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1.0));
+			float2 normalizedOffset = alignmentToUse / FocusDelta * 2.0;
+			float2 cateyeOffset = uv * 2 - 1;
+			cateyeOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+			cateyeOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1));
 
-			float distFromCenter = length(lensOffset);
-			float2 radialDirection = distFromCenter > 1e-6 ? lensOffset / distFromCenter : float2(0.0, 0.0);
+			float distFromCenter = length(cateyeOffset);
+			cateyeOffset /= max(1e-6, distFromCenter);
 			
-			float catseyeFalloff = smoothstep(CateyeRadiusStart - 0.001, CateyeRadiusStart + 0.001, distFromCenter);
-			float effectFactor = catseyeFalloff * step(0.001, abs(CateyeIntensity));
-			float cateyeStrength = linearstep(CateyeRadiusStart, CateyeRadiusEnd, distFromCenter) * sqrt(2.0) * CateyeIntensity;
+            float catseyeFalloff = smoothstep(CateyeRadiusStart - 0.001, CateyeRadiusStart + 0.001, distFromCenter);
+            float effectFactor = catseyeFalloff * step(0.001, abs(CateyeIntensity));
+            float cateyeStrength = linearstep(CateyeRadiusStart, CateyeRadiusEnd, distFromCenter) * sqrt(2.0) * CateyeIntensity;
 
-			normalizedOffset += radialDirection * cateyeStrength * effectFactor;
-			float cateyeMask = lerp(1.0, smoothstep(1.0, 0.98, length(normalizedOffset)), effectFactor);
+            cateyeOffset *= cateyeStrength * effectFactor;
+            normalizedOffset += cateyeOffset;
+            float cateyeMask = lerp(1.0, smoothstep(1.0, 0.98, length(normalizedOffset)), effectFactor);
+			
 			result.rgb *= cateyeMask;
 			result.a *= CateyeVignette ? 1 : cateyeMask;
 
-			// Lens vignetting is evaluated per aperture sample while the DOF is accumulated.
-			// Off-axis image points see a shifted entrance pupil. Samples which fall outside
-			// that pupil are progressively rejected, so the bokeh shape and brightness are
-			// both affected by the actual multi-shot render instead of by a final dark overlay.
-			if(VignettingEnabled)
+			// Render-time lens vignetting: progressively occlude the sampling pupil
+			// toward the image edges. This changes the accumulated bokeh itself rather
+			// than multiplying the finished image by a radial darkening mask.
+			if(VignettingEnabled && VignettingStrength > 0.0001)
 			{
-				float vignetteFalloff = linearstep(VignettingStart, VignettingEnd, distFromCenter);
-				float pupilShift = vignetteFalloff * VignettingStrength * sqrt(2.0);
-				float2 vignetteSample = apertureSample + radialDirection * pupilShift;
-				float vignetteMask = smoothstep(1.0, 0.98, length(vignetteSample));
+				float2 fieldOffset = uv * 2.0 - 1.0;
+				fieldOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+				fieldOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1.0));
+				float fieldRadius = length(fieldOffset);
 
-				// Keep alpha untouched: rejected lens samples contribute less light instead of
-				// being renormalized away. This makes the vignetting part of the DOF exposure.
-				result.rgb *= vignetteMask;
+				float edgeProgress = smoothstep(VignettingStart, VignettingEnd, fieldRadius);
+				float2 fieldDirection = fieldOffset / max(fieldRadius, 1e-5);
+
+				// alignmentToUse/FocusDelta describes where this sample sits in the
+				// normalized pupil. Off-axis viewing shifts that pupil in the direction
+				// of the frame edge, naturally clipping one side of the bokeh first.
+				float2 pupilSample = alignmentToUse / max(abs(FocusDelta), 1e-5) * 2.0;
+				float pupilShift = edgeProgress * VignettingStrength;
+				float pupilDistance = length(pupilSample + fieldDirection * pupilShift);
+				float pupilMask = 1.0 - smoothstep(1.0, 1.04, pupilDistance);
+
+				result.rgb *= pupilMask;
+				result.a *= pupilMask;
 			}
 			
 			if(BlendFactor < 0.75)
@@ -375,6 +461,7 @@ namespace IgcsDOF
 			tex2Dstore(StorageDisplay, i.dispatchthreadid.xy, float4(result.rgb, 1));			
 		}
 	}
+
 
 	void VS_Output(in uint id : SV_VertexID, out float4 vpos : SV_Position, out float2 texcoord : TEXCOORD)
 	{
