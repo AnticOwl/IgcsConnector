@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test5-true-two-pass"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test6-vignetting-center"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -148,6 +148,28 @@ namespace IgcsDOF
 		ui_step = 0.001;
 		ui_tooltip = "Normalized lens radius where the requested distortion reaches full strength.";
 	> = 1.0;
+
+	uniform bool VignettingShowGuide <
+		ui_category = "Vignetting (TEST)";
+		ui_label = "Show center / radius guide";
+		ui_tooltip = "Shows the vignetting center as a H/V cross plus the start and end radii during DOF setup.";
+	> = true;
+
+	uniform float VignettingCenterX <
+		ui_category = "Vignetting (TEST)";
+		ui_label = "Vignetting center X";
+		ui_type = "drag";
+		ui_min = 0.0; ui_max = 1.0;
+		ui_step = 0.001;
+	> = 0.5;
+
+	uniform float VignettingCenterY <
+		ui_category = "Vignetting (TEST)";
+		ui_label = "Vignetting center Y";
+		ui_type = "drag";
+		ui_min = 0.0; ui_max = 1.0;
+		ui_step = 0.001;
+	> = 0.5;
 
 	// ------------------------------
 	// Hidden values, set by the connector
@@ -398,6 +420,15 @@ namespace IgcsDOF
 		return length(p) / max(maxRadius, 1e-5);
 	}
 
+	float vignettingRadius01(float2 uv)
+	{
+		float2 p = (uv - float2(VignettingCenterX, VignettingCenterY)) * 2.0;
+		const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+		p.y /= screenAspect;
+		p /= length(float2(rcp(screenAspect), 1.0));
+		return length(p);
+	}
+
 	float2 applyLensDistortion(float2 uv)
 	{
 		if(!LensDistortionEnabled || (abs(LensDistortionStrength) < 0.000001 && abs(LensDistortionCurve) < 0.000001))
@@ -523,7 +554,7 @@ namespace IgcsDOF
 
 			if(VignettingEnabled && VignettingStrength > 0.0001)
 			{
-				float2 fieldOffset = warpedUv * 2.0 - 1.0;
+				float2 fieldOffset = (warpedUv - float2(VignettingCenterX, VignettingCenterY)) * 2.0;
 				fieldOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
 				fieldOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1.0));
 				float fieldRadius = length(fieldOffset);
@@ -608,6 +639,34 @@ namespace IgcsDOF
 			if(crossV || crossH)
 			{
 				fragment = lerp(fragment, float3(0.15, 0.95, 1.0), 0.95);
+			}
+		}
+
+		if(SessionState==2 && VignettingEnabled && VignettingShowGuide)
+		{
+			const float2 center = float2(VignettingCenterX, VignettingCenterY);
+			const float radius01 = vignettingRadius01(texcoord);
+			const float px = BUFFER_PIXEL_SIZE.x;
+			const float py = BUFFER_PIXEL_SIZE.y;
+			const float crossHalfX = 28.0 * px;
+			const float crossHalfY = 28.0 * py;
+			const bool crossV = abs(texcoord.x - center.x) <= 1.5 * px && abs(texcoord.y - center.y) <= crossHalfY;
+			const bool crossH = abs(texcoord.y - center.y) <= 1.5 * py && abs(texcoord.x - center.x) <= crossHalfX;
+			const float ringThickness = 0.0040;
+			const bool onStartRing = abs(radius01 - VignettingStart) <= ringThickness;
+			const bool onEndRing = abs(radius01 - VignettingEnd) <= ringThickness;
+
+			if(onEndRing)
+			{
+				fragment = lerp(fragment, float3(0.95, 0.25, 0.95), 0.85);
+			}
+			if(onStartRing)
+			{
+				fragment = lerp(fragment, float3(0.70, 0.45, 1.0), 0.90);
+			}
+			if(crossV || crossH)
+			{
+				fragment = lerp(fragment, float3(0.95, 0.75, 1.0), 0.95);
 			}
 		}
 	}
