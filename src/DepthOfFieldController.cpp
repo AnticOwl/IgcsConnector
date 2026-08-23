@@ -111,6 +111,7 @@ void DepthOfFieldController::writeVariableStateToShader(reshade::api::effect_run
 	setUniformBoolVariable(runtime, "BlendFrame", _blendFrame);
 	setUniformFloatVariable(runtime, "BlendFactor", _blendFactor);
 	setUniformFloat2Variable(runtime, "AlignmentDelta", _xAlignmentDelta, _yAlignmentDelta);
+	setUniformFloatVariable(runtime, "TiltPassSign", _tiltPassSign);
 	setUniformFloatVariable(runtime, "HighlightBoost", _highlightBoostFactor);
 
 	setUniformFloatVariable(runtime, "SampleWeightR", _sampleWeightRGB[0]);
@@ -241,6 +242,8 @@ void DepthOfFieldController::startSession(reshade::api::effect_runtime* runtime)
 		return;
 	}
 
+	_tiltTwoPass = false;
+	_tiltPassSign = 1.0f;
 	calculateShapePoints();
 
 	{
@@ -264,7 +267,9 @@ void DepthOfFieldController::endSession(reshade::api::effect_runtime* runtime)
 {
 	_state = DepthOfFieldControllerState::Off;
 	_renderPaused = false;
+	_tiltPassSign = 1.0f;
 	setUniformIntVariable(runtime, "SessionState", (int)_state);
+	setUniformFloatVariable(runtime, "TiltPassSign", _tiltPassSign);
 
 	if(_cameraToolsConnector.cameraToolsConnected())
 	{
@@ -332,6 +337,7 @@ void DepthOfFieldController::performRenderFrameSetupWork()
 		const auto& currentBlendFrameData = _cameraSteps[_currentBlendFrame];
 		_xAlignmentDelta = currentBlendFrameData.xAlignmentDelta;
 		_yAlignmentDelta = currentBlendFrameData.yAlignmentDelta;
+		_tiltPassSign = currentBlendFrameData.tiltPassSign;
 		_blendFactor = 1.0f / (static_cast<float>(_currentBlendFrame) + 1.0f);
 
 		const float numSamples = static_cast<float>(_cameraSteps.size());
@@ -537,11 +543,6 @@ void DepthOfFieldController::applyAstigmatismFocusPlane(float x, float y, float 
 		return;
 	}
 
-	// Astigmatic defocus is represented as a symmetric two-axis focus split.
-	// In the lens frame, one meridian is focused in front of the nominal plane
-	// and the orthogonal meridian behind it. Strength 0 is the stock IGCSDOF
-	// focus alignment. Strength 2 reaches the deliberately extreme 2x/0x split
-	// without inverting either focus axis.
 	const float angle = IGCS::Utils::degreesToRadians(_astigmatismRotation);
 	const float cosAngle = cosf(angle);
 	const float sinAngle = sinf(angle);
@@ -732,6 +733,18 @@ void DepthOfFieldController::calculateShapePoints()
 			createCircleDoFPoints();
 			break;
 	}
+
+	if(_tiltTwoPass && !_cameraSteps.empty())
+	{
+		const size_t firstPassCount = _cameraSteps.size();
+		for(size_t i = 0; i < firstPassCount; ++i)
+		{
+			CameraLocation secondPassStep = _cameraSteps[i];
+			secondPassStep.tiltPassSign = -1.0f;
+			_cameraSteps.push_back(secondPassStep);
+		}
+		renormalizeBokehWeights();
+	}
 }
 
 
@@ -747,10 +760,19 @@ void DepthOfFieldController::startRender(reshade::api::effect_runtime* runtime)
 		return;
 	}
 
-	reshade::log::message(reshade::log::level::info, "Dof render session started");
+	_tiltTwoPass = false;
+	const auto twoPassVariable = runtime->find_uniform_variable("IgcsDof.fx", "TiltedFocusPlaneTwoPass");
+	if(twoPassVariable.handle > 0)
+	{
+		runtime->get_uniform_value_bool(twoPassVariable, &_tiltTwoPass, 1, 0);
+	}
+	calculateShapePoints();
+
+	reshade::log::message(reshade::log::level::info, _tiltTwoPass ? "Dof render session started (Tilt two-pass)" : "Dof render session started");
 
 	_blendFrame = false;
 	_blendFactor = 0.0f;
+	_tiltPassSign = 1.0f;
 	_currentStepFrame = 0;
 	_currentBlendFrame = 0;
 	_stepCounter = 0;
@@ -856,13 +878,10 @@ void DepthOfFieldController::drawAstigmatismPreview(ImDrawList* drawList, ImVec2
 	const ImVec2 axisB(-sinAngle, -cosAngle);
 	const float axisLength = std::min(width, height) * 0.34f;
 
-	// The central cross shows the two astigmatic meridians in the image plane.
 	drawList->AddLine(ImVec2(center.x - axisA.x * axisLength, center.y - axisA.y * axisLength), ImVec2(center.x + axisA.x * axisLength, center.y + axisA.y * axisLength), axisColor, 1.0f);
 	drawList->AddLine(ImVec2(center.x - axisB.x * axisLength, center.y - axisB.y * axisLength), ImVec2(center.x + axisB.x * axisLength, center.y + axisB.y * axisLength), axisColor, 1.0f);
 	drawList->AddCircleFilled(center, 3.0f, IM_COL32(255, 255, 255, 255));
 
-	// Side view of the focal split. Strength is mapped exactly like the render
-	// math: 0..2 becomes a symmetric 0..1 split around the nominal focus plane.
 	const float splitNormalized = (_astigmatismEnabled ? _astigmatismStrength : 0.0f) * 0.5f;
 	const float maxPlaneOffset = width * 0.23f;
 	const float planeOffset = splitNormalized * maxPlaneOffset;
