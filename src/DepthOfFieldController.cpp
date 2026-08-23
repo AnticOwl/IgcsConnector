@@ -148,6 +148,11 @@ void DepthOfFieldController::loadIniFileData(CDataFile& iniFile)
 	loadFloatFromIni(iniFile, "MagnificationAreaWidth", &_magnificationSettings.WidthMagnifierArea);
 	loadFloatFromIni(iniFile, "MagnificationAreaHeight", &_magnificationSettings.HeightMagnifierArea);
 	loadFloatFromIni(iniFile, "AnamorphicFactor", &_anamorphicFactor);
+	loadBoolFromIni(iniFile, "AstigmatismEnabled", &_astigmatismEnabled, false);
+	loadFloatFromIni(iniFile, "AstigmatismStrength", &_astigmatismStrength);
+	loadFloatFromIni(iniFile, "AstigmatismRotation", &_astigmatismRotation);
+	_astigmatismStrength = IGCS::Utils::clampEx(_astigmatismStrength, 0.0f, 1.0f);
+	_astigmatismRotation = IGCS::Utils::clampEx(_astigmatismRotation, 0.0f, 180.0f);
 	loadFloatFromIni(iniFile, "RingAngleOffset", &_ringAngleOffset);
 	loadFloatFromIni(iniFile, "RotationAngle", &_apertureShapeSettings.RotationAngle);
 	loadFloatFromIni(iniFile, "RoundFactor", &_apertureShapeSettings.RoundFactor);
@@ -183,6 +188,9 @@ void DepthOfFieldController::saveIniFileData(CDataFile& iniFile)
 	iniFile.SetFloat("MagnificationAreaWidth", _magnificationSettings.WidthMagnifierArea, "", "DepthOfField");
 	iniFile.SetFloat("MagnificationAreaHeight", _magnificationSettings.HeightMagnifierArea, "", "DepthOfField");
 	iniFile.SetFloat("AnamorphicFactor", _anamorphicFactor, "", "DepthOfField");
+	iniFile.SetBool("AstigmatismEnabled", _astigmatismEnabled, "", "DepthOfField");
+	iniFile.SetFloat("AstigmatismStrength", _astigmatismStrength, "", "DepthOfField");
+	iniFile.SetFloat("AstigmatismRotation", _astigmatismRotation, "", "DepthOfField");
 	iniFile.SetFloat("RingAngleOffset", _ringAngleOffset, "", "DepthOfField");
 	iniFile.SetFloat("RotationAngle", _apertureShapeSettings.RotationAngle, "", "DepthOfField");
 	iniFile.SetFloat("RoundFactor", _apertureShapeSettings.RoundFactor, "", "DepthOfField");
@@ -556,6 +564,29 @@ void DepthOfFieldController::applyFringe(float ringRadiusNormalized, float sampl
 }
 
 
+void DepthOfFieldController::applyAstigmatism(float& x, float& y)
+{
+	if(!_astigmatismEnabled || _astigmatismStrength <= FLT_EPSILON)
+	{
+		return;
+	}
+
+	// The rotation value describes the major axis of the astigmatic ellipse.
+	// We only compress the perpendicular axis, so enabling astigmatism never
+	// increases the maximum camera travel beyond MaxBokehSize.
+	const float angle = IGCS::Utils::degreesToRadians(_astigmatismRotation);
+	const float cosAngle = cosf(angle);
+	const float sinAngle = sinf(angle);
+
+	const float localX = (x * cosAngle) + (y * sinAngle);
+	const float localY = (-x * sinAngle) + (y * cosAngle);
+	const float compressedY = localY * (1.0f - _astigmatismStrength);
+
+	x = (localX * cosAngle) - (compressedY * sinAngle);
+	y = (localX * sinAngle) + (compressedY * cosAngle);
+}
+
+
 void DepthOfFieldController::createCircleDoFPoints()
 {
 	_cameraSteps.clear();
@@ -578,8 +609,9 @@ void DepthOfFieldController::createCircleDoFPoints()
 		{
 			const float sinAngle = sin(angle);
 			const float cosAngle = cos(angle);
-			const float x = ringDistance * cosAngle * _anamorphicFactor;
-			const float y = ringDistance * sinAngle;
+			float x = ringDistance * cosAngle * _anamorphicFactor;
+			float y = ringDistance * sinAngle;
+			applyAstigmatism(x, y);
 			const float xDelta = maxBokehRadius * x;
 			const float yDelta = maxBokehRadius * y;
 
@@ -658,6 +690,7 @@ void DepthOfFieldController::createApertureShapedDoFPoints()
 				//as the anamorphic lens is the last lens in front of the sensor/film
 				const float radiusNormalized = sqrtf(x * x + y * y); 
 				x *= _anamorphicFactor; //apply scaling here after calculating spherical aberration
+				applyAstigmatism(x, y);
 				const float xDelta = maxBokehRadius * x;
 				const float yDelta = maxBokehRadius * y;
 				CameraLocation sample = {xDelta, yDelta, x * -focusDeltaHalf, y * focusDeltaHalf, 1.0f, 1.0f, 1.0f};	
@@ -940,4 +973,3 @@ void DepthOfFieldController::loadBoolFromIni(CDataFile& iniFile, const std::stri
 	}
 	*toWriteTo = valueToUse;
 }
-
