@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test4-distortion-guide"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test5-true-two-pass"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -78,6 +78,12 @@ namespace IgcsDOF
 		ui_step = 0.1;
 		ui_tooltip = "Direction of the focus-depth gradient. 0 degrees = left/right, 90 degrees = top/bottom.";
 	> = 0.0;
+
+	uniform bool TiltedFocusPlaneTwoPass <
+		ui_category = "Tilt (TEST)";
+		ui_label = "Two-pass (+Tilt / -Tilt)";
+		ui_tooltip = "Runs the complete camera sample sequence with +Tilt, then repeats the same XYZ sequence with -Tilt. Render time is approximately doubled.";
+	> = false;
 
 	uniform bool LensDistortionEnabled <
 		ui_category = "Distortion (TEST)";
