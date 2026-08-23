@@ -56,6 +56,7 @@ class DepthOfFieldController
 		float yAlignmentDelta = 0.0f;
 
 		float sampleWeightRGB[3] = {1.0f, 1.0f, 1.0f};
+		float tiltPassSign = 1.0f;
 	};
 
 	struct MagnifierSettings
@@ -160,6 +161,22 @@ public:
 		_astigmatismRotation = IGCS::Utils::clampEx(newValue, 0.0f, 180.0f);
 		calculateShapePoints();
 	}
+	void setTiltEnabled(bool newValue)
+	{
+		_tiltEnabled = newValue;
+		calculateShapePoints();
+	}
+	void setTiltAngle(float newValue)
+	{
+		_tiltAngle = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f);
+		calculateShapePoints();
+	}
+	void setTiltRotation(float newValue) { _tiltRotation = IGCS::Utils::clampEx(newValue, 0.0f, 180.0f); }
+	void setTiltTwoPass(bool newValue)
+	{
+		_tiltTwoPass = newValue;
+		calculateShapePoints();
+	}
 	void setVignettingEnabled(bool newValue) { _vignettingEnabled = newValue; }
 	void setVignettingStart(float newValue)
 	{
@@ -241,6 +258,10 @@ public:
 	bool getAstigmatismEnabled() { return _astigmatismEnabled; }
 	float getAstigmatismStrength() { return _astigmatismStrength; }
 	float getAstigmatismRotation() { return _astigmatismRotation; }
+	bool getTiltEnabled() { return _tiltEnabled; }
+	float getTiltAngle() { return _tiltAngle; }
+	float getTiltRotation() { return _tiltRotation; }
+	bool getTiltTwoPass() { return _tiltTwoPass; }
 	bool getVignettingEnabled() { return _vignettingEnabled; }
 	float getVignettingStart() { return _vignettingStart; }
 	float getVignettingEnd() { return _vignettingEnd; }
@@ -310,6 +331,7 @@ private:
 	float _blendFactor = 0.0f;
 	float _xAlignmentDelta = 0.0f;
 	float _yAlignmentDelta = 0.0f;
+	float _tiltPassSign = 1.0f;
 	float _highlightBoostFactor = 0.9f;
 	float _highlightGammaFactor = 2.2f;
 	float _sphericalAberrationDimFactor = 0.5f;
@@ -348,6 +370,10 @@ private:
 	bool _astigmatismEnabled = false;
 	float _astigmatismStrength = 0.0f;
 	float _astigmatismRotation = 0.0f;
+	bool _tiltEnabled = false;
+	float _tiltAngle = 0.0f;
+	float _tiltRotation = 0.0f;
+	bool _tiltTwoPass = false;
 	bool _vignettingEnabled = false;
 	float _vignettingStart = 0.65f;
 	float _vignettingEnd = 1.0f;
