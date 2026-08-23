@@ -193,6 +193,21 @@ public:
 		_anamorphicFactor = IGCS::Utils::clampEx(newValue, 0.01f, 1.0f);
 		calculateShapePoints();
 	}
+	void setAstigmatismEnabled(bool newValue)
+	{
+		_astigmatismEnabled = newValue;
+		calculateShapePoints();
+	}
+	void setAstigmatismStrength(float newValue)
+	{
+		_astigmatismStrength = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f);
+		calculateShapePoints();
+	}
+	void setAstigmatismRotation(float newValue)
+	{
+		_astigmatismRotation = IGCS::Utils::clampEx(newValue, 0.0f, 180.0f);
+		calculateShapePoints();
+	}
 	void setRingAngleOffset(float newValue)
 	{
 		_ringAngleOffset = IGCS::Utils::clampEx(newValue, -2.0f, 2.0f);
@@ -253,6 +268,9 @@ public:
 	int getTotalNumberOfStepsToTake() { return _cameraSteps.size(); }
 	bool getShowProgressBarAsOverlay() { return _showProgressBarAsOverlay; }
 	float getAnamorphicFactor() { return _anamorphicFactor; }
+	bool getAstigmatismEnabled() { return _astigmatismEnabled; }
+	float getAstigmatismStrength() { return _astigmatismStrength; }
+	float getAstigmatismRotation() { return _astigmatismRotation; }
 	float getRingAngleOffset() { return _ringAngleOffset; }
 	float getSphericalAberrationDimFactor() { return _sphericalAberrationDimFactor; }
 	float getFringeIntensity() { return _fringeIntensity; }
@@ -293,6 +311,7 @@ private:
 	void applyRenderOrder();
 	void renormalizeBokehWeights();
 	void createApertureShapedDoFPoints();
+	void applyAstigmatism(float& x, float& y);
 
 	void displayScreenshotSessionStartError(const ScreenshotSessionStartReturnCode sessionStartResult);
 	/// <summary>
@@ -383,6 +402,9 @@ private:
 	int _numberOfPointsInnermostRing;
 	float _ringAngleOffset = 0.0f;
 	float _anamorphicFactor = 1.0f;
+	bool _astigmatismEnabled = false;
+	float _astigmatismStrength = 0.0f;
+	float _astigmatismRotation = 0.0f;	// major-axis rotation in degrees, 0..180
 	DepthOfFieldRenderOrder _renderOrder = DepthOfFieldRenderOrder::InnerRingToOuterRing;
 	bool _showProgressBarAsOverlay = true;
 	ApertureShapeSettings _apertureShapeSettings;
@@ -396,4 +418,3 @@ private:
 	bool _debugBool1 = false;
 	bool _debugBool2 = false;
 };
-
