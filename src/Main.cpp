@@ -112,7 +112,7 @@ void addCameraPath()
 
 void removeCameraPath(int pathIndex)
 {
-	g_reshadeStateController.removeCameraPath(pathIndex);
+	g_reshadeStateController.removePath(pathIndex);
 }
 
 void appendStateSnapshotToPath(int pathIndex)
@@ -528,47 +528,83 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("This offset lets you rotate rings relative\nto each other to avoid the common grid pattern with lower\namount of rings.");
 							if(changed) g_depthOfFieldController.setRingAngleOffset(ringAngleOffset);
 
+							ImGui::SeparatorText("Anamorphic");
+							bool anamorphicEnabled = g_depthOfFieldController.getAnamorphicEnabled();
+							changed = ImGui::Checkbox("Enable anamorphic", &anamorphicEnabled);
+							if(changed)
+							{
+								g_depthOfFieldController.setAnamorphicEnabled(anamorphicEnabled);
+								saveIniFile();
+							}
 							float anamorphicFactor = g_depthOfFieldController.getAnamorphicFactor();
 							changed = ImGui::DragFloat("Anamorphic factor", &anamorphicFactor, 0.001f, 0.01f, 1.0f);
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Mainly meant for circular shapes\nAt 1.0 it gives perfect round bokehs,\n at a lower value it gives vertical ellipses.");
-							if(changed) g_depthOfFieldController.setAnamorphicFactor(anamorphicFactor);
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("At 1.0 the bokeh keeps its original width.\nLower values squeeze the sampling aperture horizontally.");
+							if(changed)
+							{
+								g_depthOfFieldController.setAnamorphicFactor(anamorphicFactor);
+								saveIniFile();
+							}
 
+							ImGui::SeparatorText("Astigmatism");
 							bool astigmatismEnabled = g_depthOfFieldController.getAstigmatismEnabled();
 							changed = ImGui::Checkbox("Enable astigmatism", &astigmatismEnabled);
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Adds directional aperture deformation and differential focus alignment.");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Splits the focus plane along two perpendicular lens axes.\nOne axis focuses nearer, the other farther.");
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismEnabled(astigmatismEnabled);
 								saveIniFile();
 							}
-
 							float astigmatismStrength = g_depthOfFieldController.getAstigmatismStrength();
-							changed = ImGui::DragFloat("Astigmatism shape strength", &astigmatismStrength, 0.001f, 0.0f, 1.0f, "%.3f");
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Deforms the camera sampling aperture along the selected astigmatism axis.");
+							changed = ImGui::DragFloat("Astigmatism strength", &astigmatismStrength, 0.001f, 0.0f, 3.0f, "%.3f");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Controls the distance between the two astigmatic focus planes.\n0 is the original IGCSDOF focus plane; values above 1 intentionally exaggerate the split.");
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismStrength(astigmatismStrength);
 								saveIniFile();
 							}
-
-							float astigmatismFocusShiftStrength = g_depthOfFieldController.getAstigmatismFocusShiftStrength();
-							changed = ImGui::DragFloat("Astigmatism focus shift", &astigmatismFocusShiftStrength, 0.001f, 0.0f, 1.0f, "%.3f");
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Separates the focus compensation of the two perpendicular astigmatic axes.\n0 keeps the normal IGCS focus alignment; 1 gives the strongest differential shift.");
-							if(changed)
-							{
-								g_depthOfFieldController.setAstigmatismFocusShiftStrength(astigmatismFocusShiftStrength);
-								saveIniFile();
-							}
-
 							float astigmatismRotation = g_depthOfFieldController.getAstigmatismRotation();
 							changed = ImGui::DragFloat("Astigmatism rotation", &astigmatismRotation, 0.1f, 0.0f, 180.0f, "%.1f deg");
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Rotation of the astigmatism axes in degrees.");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Rotation of the two astigmatic focus axes in degrees.");
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismRotation(astigmatismRotation);
 								saveIniFile();
 							}
 
+							ImGui::SeparatorText("Vignetting");
+							bool vignettingEnabled = g_depthOfFieldController.getVignettingEnabled();
+							changed = ImGui::Checkbox("Enable vignetting", &vignettingEnabled);
+							if(changed)
+							{
+								g_depthOfFieldController.setVignettingEnabled(vignettingEnabled);
+								saveIniFile();
+							}
+							float vignettingStart = g_depthOfFieldController.getVignettingStart();
+							changed = ImGui::DragFloat("Vignetting start", &vignettingStart, 0.001f, 0.0f, 0.999f, "%.3f");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Normalized radius where the vignette starts. 0 is image center, 1 is the corner radius.");
+							if(changed)
+							{
+								g_depthOfFieldController.setVignettingStart(vignettingStart);
+								saveIniFile();
+							}
+							float vignettingEnd = g_depthOfFieldController.getVignettingEnd();
+							changed = ImGui::DragFloat("Vignetting end", &vignettingEnd, 0.001f, 0.001f, 1.0f, "%.3f");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Normalized radius where the vignette reaches full strength.");
+							if(changed)
+							{
+								g_depthOfFieldController.setVignettingEnd(vignettingEnd);
+								saveIniFile();
+							}
+							float vignettingStrength = g_depthOfFieldController.getVignettingStrength();
+							changed = ImGui::DragFloat("Vignetting strength", &vignettingStrength, 0.001f, 0.0f, 1.0f, "%.3f");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Maximum darkening at and beyond the end radius.");
+							if(changed)
+							{
+								g_depthOfFieldController.setVignettingStrength(vignettingStrength);
+								saveIniFile();
+							}
+
+							ImGui::SeparatorText("Bokeh characteristics");
 							float sphericalAberrationDimFactor = g_depthOfFieldController.getSphericalAberrationDimFactor();
 							changed = ImGui::DragFloat("Spherical aberration dim factor", &sphericalAberrationDimFactor, 0.001f, 0.0f, 1.0f);
 							if(changed) g_depthOfFieldController.setSphericalAberrationDimFactor(sphericalAberrationDimFactor);
