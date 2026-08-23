@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test2"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test3-distortion"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -56,13 +56,13 @@ namespace IgcsDOF
 	> = 0.5;
 
 	uniform bool TiltedFocusPlaneEnabled <
-		ui_category = "Tilted Focus Plane (TEST)";
-		ui_label = "Enable tilted focus plane";
+		ui_category = "Tilt (TEST)";
+		ui_label = "Enable Tilt";
 		ui_tooltip = "Tilts the focus plane around the normal focus pivot. The pivot itself remains unchanged.";
 	> = false;
 
 	uniform float TiltedFocusPlaneAngle <
-		ui_category = "Tilted Focus Plane (TEST)";
+		ui_category = "Tilt (TEST)";
 		ui_label = "Tilt angle";
 		ui_type = "drag";
 		ui_min = -45.0; ui_max = 45.0;
@@ -71,7 +71,7 @@ namespace IgcsDOF
 	> = 0.0;
 
 	uniform float TiltedFocusPlaneRotation <
-		ui_category = "Tilted Focus Plane (TEST)";
+		ui_category = "Tilt (TEST)";
 		ui_label = "Tilt rotation";
 		ui_type = "drag";
 		ui_min = 0.0; ui_max = 180.0;
@@ -80,10 +80,50 @@ namespace IgcsDOF
 	> = 0.0;
 
 	uniform bool TiltedFocusPlaneTwoPass <
-		ui_category = "Tilted Focus Plane (TEST)";
+		ui_category = "Tilt (TEST)";
 		ui_label = "Two-pass (+Tilt / -Tilt)";
 		ui_tooltip = "Evaluates both tilt directions around the same focus pivot and blends them equally. This is a shader-side validation of the two-pass idea.";
 	> = false;
+
+	uniform bool LensDistortionEnabled <
+		ui_category = "Distortion (TEST)";
+		ui_label = "Enable distortion";
+		ui_tooltip = "Applies radial lens distortion in the same sampling space as the DOF alignment, so focus and bokeh follow the warped image rather than being distorted only as a final post-process.";
+	> = false;
+
+	uniform float LensDistortionStrength <
+		ui_category = "Distortion (TEST)";
+		ui_label = "Radial strength";
+		ui_type = "drag";
+		ui_min = -0.75; ui_max = 0.75;
+		ui_step = 0.001;
+		ui_tooltip = "Signed first-order radial distortion. Positive and negative values produce opposite barrel/pincushion directions.";
+	> = 0.0;
+
+	uniform float LensDistortionCurve <
+		ui_category = "Distortion (TEST)";
+		ui_label = "Secondary curve";
+		ui_type = "drag";
+		ui_min = -0.75; ui_max = 0.75;
+		ui_step = 0.001;
+		ui_tooltip = "Second radial term. Use small values to shape how strongly the distortion grows toward the corners.";
+	> = 0.0;
+
+	uniform float LensDistortionCenterX <
+		ui_category = "Distortion (TEST)";
+		ui_label = "Distortion center X";
+		ui_type = "drag";
+		ui_min = 0.0; ui_max = 1.0;
+		ui_step = 0.001;
+	> = 0.5;
+
+	uniform float LensDistortionCenterY <
+		ui_category = "Distortion (TEST)";
+		ui_label = "Distortion center Y";
+		ui_type = "drag";
+		ui_min = 0.0; ui_max = 1.0;
+		ui_step = 0.001;
+	> = 0.5;
 
 	// ------------------------------
 	// Hidden values, set by the connector
@@ -322,6 +362,28 @@ namespace IgcsDOF
 		return saturate((x - lo) / (hi - lo));
 	}
 
+	float2 applyLensDistortion(float2 uv)
+	{
+		if(!LensDistortionEnabled || (abs(LensDistortionStrength) < 0.000001 && abs(LensDistortionCurve) < 0.000001))
+		{
+			return uv;
+		}
+
+		const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+		const float2 center = float2(LensDistortionCenterX, LensDistortionCenterY);
+		float2 p = uv - center;
+
+		// Work in aspect-corrected image space so radial distortion is circular in
+		// lens space instead of becoming oval on a widescreen backbuffer.
+		p.x *= screenAspect;
+		const float r2 = dot(p, p);
+		const float scale = 1.0 + LensDistortionStrength * r2 + LensDistortionCurve * r2 * r2;
+		p *= scale;
+		p.x /= screenAspect;
+
+		return center + p;
+	}
+
 	float2 applyTiltedFocusPlaneWithAngle(float2 uv, float2 alignment, float tiltAngle)
 	{
 		if(!TiltedFocusPlaneEnabled || abs(tiltAngle) < 0.0001)
@@ -375,14 +437,15 @@ namespace IgcsDOF
 		}
 		else if(SessionState == 2)
 		{
-			float2 setupAlignment = applyTiltedFocusPlane(uv, float2(FocusDelta, 0.0));
-			float2 shifted_uv = uv - setupAlignment;
+			const float2 warpedUv = applyLensDistortion(uv);
+			float2 setupAlignment = applyTiltedFocusPlane(warpedUv, float2(FocusDelta, 0.0));
+			float2 shifted_uv = warpedUv - setupAlignment;
 			float3 currentFragment = tex2Dlod(ReShade::BackBuffer, float4(shifted_uv, 0, 0)).rgb;
 
 			if(TiltedFocusPlaneEnabled && TiltedFocusPlaneTwoPass && abs(TiltedFocusPlaneAngle) >= 0.0001)
 			{
-				float2 setupAlignmentOpposite = applyTiltedFocusPlaneWithAngle(uv, float2(FocusDelta, 0.0), -TiltedFocusPlaneAngle);
-				float2 shiftedUvOpposite = uv - setupAlignmentOpposite;
+				float2 setupAlignmentOpposite = applyTiltedFocusPlaneWithAngle(warpedUv, float2(FocusDelta, 0.0), -TiltedFocusPlaneAngle);
+				float2 shiftedUvOpposite = warpedUv - setupAlignmentOpposite;
 				float3 oppositeFragment = tex2Dlod(ReShade::BackBuffer, float4(shiftedUvOpposite, 0, 0)).rgb;
 				currentFragment = (currentFragment + oppositeFragment) * 0.5;
 			}
@@ -397,8 +460,9 @@ namespace IgcsDOF
 		if(BlendFrame)
 		{
 			const float2 aspectRatio = float2(1, float(BUFFER_PIXEL_SIZE.y) / float(BUFFER_PIXEL_SIZE.x));
-			float2 alignmentToUse = applyTiltedFocusPlane(uv, AlignmentDelta.xy);
-			float2 uvToReadFrom = uv + alignmentToUse * aspectRatio;
+			const float2 warpedUv = applyLensDistortion(uv);
+			float2 alignmentToUse = applyTiltedFocusPlane(warpedUv, AlignmentDelta.xy);
+			float2 uvToReadFrom = warpedUv + alignmentToUse * aspectRatio;
 
 			bool isInside = all(saturate(uvToReadFrom - uvToReadFrom*uvToReadFrom));
 
@@ -409,8 +473,8 @@ namespace IgcsDOF
 
 			if(TiltedFocusPlaneEnabled && TiltedFocusPlaneTwoPass && abs(TiltedFocusPlaneAngle) >= 0.0001)
 			{
-				float2 oppositeAlignment = applyTiltedFocusPlaneWithAngle(uv, AlignmentDelta.xy, -TiltedFocusPlaneAngle);
-				float2 oppositeUv = uv + oppositeAlignment * aspectRatio;
+				float2 oppositeAlignment = applyTiltedFocusPlaneWithAngle(warpedUv, AlignmentDelta.xy, -TiltedFocusPlaneAngle);
+				float2 oppositeUv = warpedUv + oppositeAlignment * aspectRatio;
 				bool oppositeInside = all(saturate(oppositeUv - oppositeUv*oppositeUv));
 				float3 oppositeColor = oppositeInside ? ReadHDRInput(oppositeUv) : 0.0;
 				float oppositeAlpha = oppositeInside ? 1.0 : 0.0;
@@ -423,7 +487,7 @@ namespace IgcsDOF
 
 			float focusDeltaSafe = abs(FocusDelta) > 1e-6 ? FocusDelta : (FocusDelta < 0.0 ? -1e-6 : 1e-6);
 			float2 normalizedOffset = alignmentToUse / focusDeltaSafe * 2.0;
-			float2 cateyeOffset = uv * 2 - 1;
+			float2 cateyeOffset = warpedUv * 2 - 1;
 			cateyeOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
 			cateyeOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1));
 
@@ -443,7 +507,7 @@ namespace IgcsDOF
 
 			if(VignettingEnabled && VignettingStrength > 0.0001)
 			{
-				float2 fieldOffset = uv * 2.0 - 1.0;
+				float2 fieldOffset = warpedUv * 2.0 - 1.0;
 				fieldOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
 				fieldOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1.0));
 				float fieldRadius = length(fieldOffset);
