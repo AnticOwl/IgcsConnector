@@ -92,6 +92,7 @@ public:
 	void calculateShapePoints();
 	void renderOverlay();
 	void drawShape(ImDrawList* drawList, ImVec2 topLeftScreenCoord, float canvasWidthHeight);
+	void drawAstigmatismPreview(ImDrawList* drawList, ImVec2 topLeftScreenCoord, float width, float height);
 	void renderProgressBar();
 	void writeVariableStateToShader(reshade::api::effect_runtime* runtime);
 	void loadIniFileData(CDataFile& iniFile);
@@ -151,7 +152,7 @@ public:
 	}
 	void setAstigmatismStrength(float newValue)
 	{
-		_astigmatismStrength = IGCS::Utils::clampEx(newValue, 0.0f, 3.0f);
+		_astigmatismStrength = IGCS::Utils::clampEx(newValue, 0.0f, 2.0f);
 		calculateShapePoints();
 	}
 	void setAstigmatismRotation(float newValue)
