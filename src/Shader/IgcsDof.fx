@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test1"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test2"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -55,8 +55,6 @@ namespace IgcsDOF
 		ui_step = 0.001;
 	> = 0.5;
 
-	// First-pass prototype controls. These stay visible in the shader UI for
-	// validation; once the focus-plane math is validated they move to the addon UI.
 	uniform bool TiltedFocusPlaneEnabled <
 		ui_category = "Tilted Focus Plane (TEST)";
 		ui_label = "Enable tilted focus plane";
@@ -80,6 +78,12 @@ namespace IgcsDOF
 		ui_step = 0.1;
 		ui_tooltip = "Direction of the focus-depth gradient. 0 degrees = left/right, 90 degrees = top/bottom.";
 	> = 0.0;
+
+	uniform bool TiltedFocusPlaneTwoPass <
+		ui_category = "Tilted Focus Plane (TEST)";
+		ui_label = "Two-pass (+Tilt / -Tilt)";
+		ui_tooltip = "Evaluates both tilt directions around the same focus pivot and blends them equally. This is a shader-side validation of the two-pass idea.";
+	> = false;
 
 	// ------------------------------
 	// Hidden values, set by the connector
@@ -318,14 +322,9 @@ namespace IgcsDOF
 		return saturate((x - lo) / (hi - lo));
 	}
 
-	// Projective first-pass model for a focus plane which pivots around the
-	// original focus reference. At the image centre signedPosition is zero, so
-	// the exact original alignment is preserved. One side receives a larger
-	// alignment and the opposite side a smaller alignment, producing a depth
-	// gradient rather than translating the focus reference itself.
-	float2 applyTiltedFocusPlane(float2 uv, float2 alignment)
+	float2 applyTiltedFocusPlaneWithAngle(float2 uv, float2 alignment, float tiltAngle)
 	{
-		if(!TiltedFocusPlaneEnabled || abs(TiltedFocusPlaneAngle) < 0.0001)
+		if(!TiltedFocusPlaneEnabled || abs(tiltAngle) < 0.0001)
 		{
 			return alignment;
 		}
@@ -338,13 +337,14 @@ namespace IgcsDOF
 		const float rotationRadians = radians(TiltedFocusPlaneRotation);
 		const float2 depthGradientAxis = float2(cos(rotationRadians), sin(rotationRadians));
 		const float signedPosition = dot(planePosition, depthGradientAxis);
-		const float tiltSlope = tan(radians(TiltedFocusPlaneAngle));
-
-		// A projective scale is closer to a tilted plane than a linear offset and
-		// keeps the centre/pivot exactly unchanged. Clamp only prevents a singular
-		// projection at intentionally extreme test settings.
+		const float tiltSlope = tan(radians(tiltAngle));
 		const float denominator = max(0.15, 1.0 + (signedPosition * tiltSlope));
 		return alignment / denominator;
+	}
+
+	float2 applyTiltedFocusPlane(float2 uv, float2 alignment)
+	{
+		return applyTiltedFocusPlaneWithAngle(uv, alignment, TiltedFocusPlaneAngle);
 	}
 
 	struct CSIN 
@@ -378,6 +378,15 @@ namespace IgcsDOF
 			float2 setupAlignment = applyTiltedFocusPlane(uv, float2(FocusDelta, 0.0));
 			float2 shifted_uv = uv - setupAlignment;
 			float3 currentFragment = tex2Dlod(ReShade::BackBuffer, float4(shifted_uv, 0, 0)).rgb;
+
+			if(TiltedFocusPlaneEnabled && TiltedFocusPlaneTwoPass && abs(TiltedFocusPlaneAngle) >= 0.0001)
+			{
+				float2 setupAlignmentOpposite = applyTiltedFocusPlaneWithAngle(uv, float2(FocusDelta, 0.0), -TiltedFocusPlaneAngle);
+				float2 shiftedUvOpposite = uv - setupAlignmentOpposite;
+				float3 oppositeFragment = tex2Dlod(ReShade::BackBuffer, float4(shiftedUvOpposite, 0, 0)).rgb;
+				currentFragment = (currentFragment + oppositeFragment) * 0.5;
+			}
+
 			float3 cachedFragment  = tex2Dfetch(StorageBlendAccumulate, i.dispatchthreadid.xy).rgb;
 			float3 fragment = lerp(cachedFragment, currentFragment, SetupAlpha);
 			tex2Dstore(StorageDisplay, i.dispatchthreadid.xy, float4(fragment, 1));
@@ -395,12 +404,25 @@ namespace IgcsDOF
 
 			float4 result;
 			result.rgb = ReadHDRInput(uvToReadFrom);
+			result.a = isInside ? 1.0 : 0.0;
+			result.rgb = isInside ? result.rgb : 0.0;
+
+			if(TiltedFocusPlaneEnabled && TiltedFocusPlaneTwoPass && abs(TiltedFocusPlaneAngle) >= 0.0001)
+			{
+				float2 oppositeAlignment = applyTiltedFocusPlaneWithAngle(uv, AlignmentDelta.xy, -TiltedFocusPlaneAngle);
+				float2 oppositeUv = uv + oppositeAlignment * aspectRatio;
+				bool oppositeInside = all(saturate(oppositeUv - oppositeUv*oppositeUv));
+				float3 oppositeColor = oppositeInside ? ReadHDRInput(oppositeUv) : 0.0;
+				float oppositeAlpha = oppositeInside ? 1.0 : 0.0;
+
+				result.rgb = (result.rgb + oppositeColor) * 0.5;
+				result.a = (result.a + oppositeAlpha) * 0.5;
+			}
+
 			result.rgb *= float3(SampleWeightR, SampleWeightG, SampleWeightB);
-			result.a = 1.0;
 
-			result.rgba = isInside ? result : 0.0;
-
-			float2 normalizedOffset = alignmentToUse / FocusDelta * 2.0;
+			float focusDeltaSafe = abs(FocusDelta) > 1e-6 ? FocusDelta : (FocusDelta < 0.0 ? -1e-6 : 1e-6);
+			float2 normalizedOffset = alignmentToUse / focusDeltaSafe * 2.0;
 			float2 cateyeOffset = uv * 2 - 1;
 			cateyeOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
 			cateyeOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1));
@@ -419,9 +441,6 @@ namespace IgcsDOF
 			result.rgb *= cateyeMask;
 			result.a *= CateyeVignette ? 1 : cateyeMask;
 
-			// Render-time lens vignetting: progressively occlude the sampling pupil
-			// toward the image edges. This changes the accumulated bokeh itself rather
-			// than multiplying the finished image by a radial darkening mask.
 			if(VignettingEnabled && VignettingStrength > 0.0001)
 			{
 				float2 fieldOffset = uv * 2.0 - 1.0;
@@ -431,10 +450,6 @@ namespace IgcsDOF
 
 				float edgeProgress = smoothstep(VignettingStart, VignettingEnd, fieldRadius);
 				float2 fieldDirection = fieldOffset / max(fieldRadius, 1e-5);
-
-				// alignmentToUse/FocusDelta describes where this sample sits in the
-				// normalized pupil. Off-axis viewing shifts that pupil in the direction
-				// of the frame edge, naturally clipping one side of the bokeh first.
 				float2 pupilSample = alignmentToUse / max(abs(FocusDelta), 1e-5) * 2.0;
 				float pupilShift = edgeProgress * VignettingStrength;
 				float pupilDistance = length(pupilSample + fieldDirection * pupilShift);
