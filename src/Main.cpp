@@ -112,7 +112,7 @@ void addCameraPath()
 
 void removeCameraPath(int pathIndex)
 {
-	g_reshadeStateController.removePath(pathIndex);
+	g_reshadeStateController.removeCameraPath(pathIndex);
 }
 
 void appendStateSnapshotToPath(int pathIndex)
