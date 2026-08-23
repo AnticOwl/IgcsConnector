@@ -548,15 +548,15 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							ImGui::SeparatorText("Astigmatism");
 							bool astigmatismEnabled = g_depthOfFieldController.getAstigmatismEnabled();
 							changed = ImGui::Checkbox("Enable astigmatism", &astigmatismEnabled);
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Splits the focus plane along two perpendicular lens axes.\nOne axis focuses nearer, the other farther.");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Splits the nominal focus into two perpendicular astigmatic focal planes.\nOne meridian focuses nearer, the orthogonal meridian farther.");
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismEnabled(astigmatismEnabled);
 								saveIniFile();
 							}
 							float astigmatismStrength = g_depthOfFieldController.getAstigmatismStrength();
-							changed = ImGui::DragFloat("Astigmatism strength", &astigmatismStrength, 0.001f, 0.0f, 3.0f, "%.3f");
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Controls the distance between the two astigmatic focus planes.\n0 is the original IGCSDOF focus plane; values above 1 intentionally exaggerate the split.");
+							changed = ImGui::DragFloat("Astigmatism strength", &astigmatismStrength, 0.001f, 0.0f, 2.0f, "%.3f");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Controls the symmetric distance between the two astigmatic focal planes.\n0 is the original IGCSDOF focus; 2 is the strongest split.");
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismStrength(astigmatismStrength);
@@ -564,12 +564,20 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							}
 							float astigmatismRotation = g_depthOfFieldController.getAstigmatismRotation();
 							changed = ImGui::DragFloat("Astigmatism rotation", &astigmatismRotation, 0.1f, 0.0f, 180.0f, "%.1f deg");
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Rotation of the two astigmatic focus axes in degrees.");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Rotation of the sagittal/tangential astigmatic meridians in the image plane.");
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismRotation(astigmatismRotation);
 								saveIniFile();
 							}
+
+							ImGui::TextUnformatted("Astigmatism preview");
+							const float astigmatismPreviewWidth = std::min(360.0f, ImGui::GetContentRegionAvail().x);
+							const float astigmatismPreviewHeight = 130.0f;
+							ImGui::InvisibleButton("astigmatism_preview", ImVec2(astigmatismPreviewWidth, astigmatismPreviewHeight), ImGuiButtonFlags_None);
+							const ImVec2 astigmatismPreviewTopLeft = ImGui::GetItemRectMin();
+							g_depthOfFieldController.drawAstigmatismPreview(ImGui::GetWindowDrawList(), astigmatismPreviewTopLeft, astigmatismPreviewWidth, astigmatismPreviewHeight);
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Near / Focus / Far shows the symmetric focal split.\nThe cross shows the two astigmatic meridians and follows Rotation.");
 
 							ImGui::SeparatorText("Vignetting");
 							bool vignettingEnabled = g_depthOfFieldController.getVignettingEnabled();
