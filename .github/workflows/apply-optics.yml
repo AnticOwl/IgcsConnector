@@ -1,0 +1,61 @@
+name: Apply optics integration
+
+on:
+  push:
+    branches: [ astigmatism ]
+    paths:
+      - '.github/workflows/apply-optics.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: astigmatism
+          fetch-depth: 0
+
+      - name: Reconstruct patch and shader
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, gzip
+          patch = gzip.decompress(base64.b64decode(Path('.github/optics/patch.gz.b64').read_text().strip()))
+          shader = gzip.decompress(base64.b64decode(Path('.github/optics/shader.gz.b64').read_text().strip()))
+          Path('/tmp/IGCSDOF_Optics_Addon_Clean.patch').write_bytes(patch)
+          Path('src/Shader/IgcsDof.fx').write_bytes(shader)
+          PY
+
+      - name: Apply addon patch
+        shell: bash
+        run: |
+          git apply --check /tmp/IGCSDOF_Optics_Addon_Clean.patch
+          git apply /tmp/IGCSDOF_Optics_Addon_Clean.patch
+
+      - name: Validate integration
+        shell: bash
+        run: |
+          test "$(grep -c 'getAnamorphicEnabled' src/Main.cpp || true)" -eq 0
+          test "$(grep -c '_anamorphicEnabled' src/DepthOfFieldController.h || true)" -eq 0
+          grep -q 'TiltedFocusPlaneMode < hidden=true;' src/Shader/IgcsDof.fx
+          grep -q 'PetzvalBokehEnabled < hidden=true;' src/Shader/IgcsDof.fx
+          grep -q 'petzvalBokehWeight' src/Shader/IgcsDof.fx
+          grep -q 'technique IgcsDOF' src/Shader/IgcsDof.fx
+          grep -q 'getTiltMode' src/DepthOfFieldController.h
+          grep -q 'PetzvalEnabled' src/DepthOfFieldController.cpp
+          grep -q 'Tilt mode' src/Main.cpp
+
+      - name: Commit clean integration
+        shell: bash
+        run: |
+          rm -rf .github/optics
+          rm -f .github/workflows/apply-optics.yml
+          git config user.name 'AnticOwl'
+          git config user.email '76813232+AnticOwl@users.noreply.github.com'
+          git add -A
+          git commit -m 'Integrate optics controls into addon'
+          git push origin HEAD:astigmatism
