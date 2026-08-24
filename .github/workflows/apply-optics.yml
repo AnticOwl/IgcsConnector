@@ -31,9 +31,28 @@ jobs:
           shader = gzip.decompress(base64.b64decode(Path('.github/optics/shader.gz.b64').read_text().strip()))
           Path('src/Shader/IgcsDof.fx').write_bytes(shader)
 
-          # The prepared patch intentionally stores context hunks without line numbers.
-          # Apply each hunk by exact old-text replacement so this is deterministic
-          # against the frozen b09212d base.
+          def common_tabs(lines):
+              vals = []
+              for line in lines:
+                  raw = line.rstrip('\r\n')
+                  if not raw.strip():
+                      continue
+                  vals.append(len(raw) - len(raw.lstrip('\t')))
+              return min(vals) if vals else 0
+
+          def deindent(lines, amount):
+              out = []
+              for line in lines:
+                  if line.strip():
+                      out.append(line[amount:] if line.startswith('\t' * amount) else line)
+                  else:
+                      out.append(line)
+              return out
+
+          def indent(lines, amount):
+              prefix = '\t' * amount
+              return ''.join((prefix + line) if line.strip() else line for line in lines)
+
           file_blocks = re.split(r'(?=^diff --git )', patch, flags=re.M)
           changed = []
           for block in file_blocks:
@@ -44,7 +63,6 @@ jobs:
                   raise RuntimeError('Could not parse file header')
               path = Path(m.group(2))
               body = block[m.end():]
-              # Strip --- / +++ file headers.
               body = re.sub(r'^--- .*\n^\+\+\+ .*\n', '', body, count=1, flags=re.M)
               hunks = body.split('@@')
               text = path.read_text(encoding='utf-8')
@@ -53,15 +71,27 @@ jobs:
                   if not hunk.strip():
                       continue
                   lines = hunk.splitlines(keepends=True)
-                  old = ''.join(line[1:] for line in lines if line.startswith((' ', '-')))
-                  new = ''.join(line[1:] for line in lines if line.startswith((' ', '+')))
-                  if not old:
+                  old_lines = [line[1:] for line in lines if line.startswith((' ', '-'))]
+                  new_lines = [line[1:] for line in lines if line.startswith((' ', '+'))]
+                  if not old_lines:
                       continue
-                  if old not in text:
-                      preview = old[:180].replace('\n', '\\n')
+                  base = common_tabs(old_lines)
+                  old_lines = deindent(old_lines, base)
+                  new_lines = deindent(new_lines, base)
+
+                  found = False
+                  for extra in range(0, 13):
+                      old = indent(old_lines, extra)
+                      if old in text:
+                          new = indent(new_lines, extra)
+                          text = text.replace(old, new, 1)
+                          found = True
+                          hunk_count += 1
+                          break
+                  if not found:
+                      preview = ''.join(old_lines)[:220].replace('\n', '\\n')
                       raise RuntimeError(f'Hunk not found in {path}: {preview}')
-                  text = text.replace(old, new, 1)
-                  hunk_count += 1
+
               if hunk_count == 0:
                   raise RuntimeError(f'No hunks applied to {path}')
               path.write_text(text, encoding='utf-8')
