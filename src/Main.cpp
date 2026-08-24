@@ -529,16 +529,9 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(changed) g_depthOfFieldController.setRingAngleOffset(ringAngleOffset);
 
 							ImGui::SeparatorText("Anamorphic");
-							bool anamorphicEnabled = g_depthOfFieldController.getAnamorphicEnabled();
-							changed = ImGui::Checkbox("Enable anamorphic", &anamorphicEnabled);
-							if(changed)
-							{
-								g_depthOfFieldController.setAnamorphicEnabled(anamorphicEnabled);
-								saveIniFile();
-							}
 							float anamorphicFactor = g_depthOfFieldController.getAnamorphicFactor();
 							changed = ImGui::DragFloat("Anamorphic factor", &anamorphicFactor, 0.001f, 0.01f, 1.0f);
-							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("At 1.0 the bokeh keeps its original width.\nLower values squeeze the sampling aperture horizontally.");
+							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Mainly meant for circular shapes\nAt 1.0 it gives perfect round bokehs,\n at a lower value it gives vertical ellipses.");
 							if(changed)
 							{
 								g_depthOfFieldController.setAnamorphicFactor(anamorphicFactor);
@@ -579,6 +572,131 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							g_depthOfFieldController.drawAstigmatismPreview(ImGui::GetWindowDrawList(), astigmatismPreviewTopLeft, astigmatismPreviewWidth, astigmatismPreviewHeight);
 							if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("Near / Focus / Far shows the symmetric focal split.\nThe cross shows the two astigmatic meridians and follows Rotation.");
 
+ImGui::SeparatorText("Tilt");
+bool tiltEnabled = g_depthOfFieldController.getTiltEnabled();
+changed = ImGui::Checkbox("Enable tilt", &tiltEnabled);
+if(changed) { g_depthOfFieldController.setTiltEnabled(tiltEnabled); saveIniFile(); }
+if(tiltEnabled)
+{
+	int tiltMode = g_depthOfFieldController.getTiltMode();
+	changed = ImGui::Combo("Tilt mode", &tiltMode, "Plane\0Cross / Saddle\0Corner Control\0\0");
+	if(changed) { g_depthOfFieldController.setTiltMode(tiltMode); saveIniFile(); }
+
+	if(tiltMode == 0)
+	{
+		float v = g_depthOfFieldController.getTiltHorizontal();
+		changed = ImGui::DragFloat("Horizontal tilt", &v, 0.1f, -45.0f, 45.0f, "%.1f deg");
+		if(changed) { g_depthOfFieldController.setTiltHorizontal(v); saveIniFile(); }
+		v = g_depthOfFieldController.getTiltVertical();
+		changed = ImGui::DragFloat("Vertical tilt", &v, 0.1f, -45.0f, 45.0f, "%.1f deg");
+		if(changed) { g_depthOfFieldController.setTiltVertical(v); saveIniFile(); }
+	}
+	else if(tiltMode == 1)
+	{
+		float v = g_depthOfFieldController.getTiltCrossSaddle();
+		changed = ImGui::DragFloat("Cross / Saddle strength", &v, 0.1f, -45.0f, 45.0f, "%.1f");
+		if(changed) { g_depthOfFieldController.setTiltCrossSaddle(v); saveIniFile(); }
+		v = g_depthOfFieldController.getTiltCrossSaddleRotation();
+		changed = ImGui::DragFloat("Cross / Saddle rotation", &v, 0.1f, 0.0f, 180.0f, "%.1f deg");
+		if(changed) { g_depthOfFieldController.setTiltCrossSaddleRotation(v); saveIniFile(); }
+	}
+	else
+	{
+		float v = g_depthOfFieldController.getTiltCornerTL();
+		changed = ImGui::DragFloat("HG / TL", &v, 0.1f, -45.0f, 45.0f, "%.1f");
+		if(changed) { g_depthOfFieldController.setTiltCornerTL(v); saveIniFile(); }
+		v = g_depthOfFieldController.getTiltCornerTR();
+		changed = ImGui::DragFloat("HD / TR", &v, 0.1f, -45.0f, 45.0f, "%.1f");
+		if(changed) { g_depthOfFieldController.setTiltCornerTR(v); saveIniFile(); }
+		v = g_depthOfFieldController.getTiltCornerBL();
+		changed = ImGui::DragFloat("BG / BL", &v, 0.1f, -45.0f, 45.0f, "%.1f");
+		if(changed) { g_depthOfFieldController.setTiltCornerBL(v); saveIniFile(); }
+		v = g_depthOfFieldController.getTiltCornerBR();
+		changed = ImGui::DragFloat("BD / BR", &v, 0.1f, -45.0f, 45.0f, "%.1f");
+		if(changed) { g_depthOfFieldController.setTiltCornerBR(v); saveIniFile(); }
+	}
+
+	float pivot[2] = { g_depthOfFieldController.getTiltPivotX(), g_depthOfFieldController.getTiltPivotY() };
+	changed = ImGui::DragFloat2("Tilt pivot X / Y", pivot, 0.001f, 0.0f, 1.0f, "%.3f");
+	if(changed)
+	{
+		g_depthOfFieldController.setTiltPivotX(pivot[0]);
+		g_depthOfFieldController.setTiltPivotY(pivot[1]);
+		saveIniFile();
+	}
+	bool showTiltOverlay = g_depthOfFieldController.getTiltShowOverlay();
+	changed = ImGui::Checkbox("Show tilt overlay", &showTiltOverlay);
+	if(changed) { g_depthOfFieldController.setTiltShowOverlay(showTiltOverlay); saveIniFile(); }
+	bool twoPass = g_depthOfFieldController.getTiltTwoPass();
+	changed = ImGui::Checkbox("Two-pass (+Tilt / -Tilt)", &twoPass);
+	if(changed) { g_depthOfFieldController.setTiltTwoPass(twoPass); saveIniFile(); }
+}
+
+ImGui::SeparatorText("Distortion");
+bool distortionEnabled = g_depthOfFieldController.getDistortionEnabled();
+changed = ImGui::Checkbox("Enable distortion", &distortionEnabled);
+if(changed) { g_depthOfFieldController.setDistortionEnabled(distortionEnabled); saveIniFile(); }
+if(distortionEnabled)
+{
+	float v = g_depthOfFieldController.getDistortionStrength();
+	changed = ImGui::DragFloat("Distortion amount (Pincushion <-> Barrel)", &v, 0.001f, -0.75f, 0.75f, "%.3f");
+	if(changed) { g_depthOfFieldController.setDistortionStrength(v); saveIniFile(); }
+	v = g_depthOfFieldController.getDistortionCurve();
+	changed = ImGui::DragFloat("Secondary curve", &v, 0.001f, -0.75f, 0.75f, "%.3f");
+	if(changed) { g_depthOfFieldController.setDistortionCurve(v); saveIniFile(); }
+	float center[2] = { g_depthOfFieldController.getDistortionCenterX(), g_depthOfFieldController.getDistortionCenterY() };
+	changed = ImGui::DragFloat2("Distortion center X / Y", center, 0.001f, 0.0f, 1.0f, "%.3f");
+	if(changed)
+	{
+		g_depthOfFieldController.setDistortionCenterX(center[0]);
+		g_depthOfFieldController.setDistortionCenterY(center[1]);
+		saveIniFile();
+	}
+	float startRadius = g_depthOfFieldController.getDistortionStartRadius();
+	changed = ImGui::DragFloat("Distortion start radius", &startRadius, 0.001f, 0.0f, 0.999f, "%.3f");
+	if(changed) { g_depthOfFieldController.setDistortionStartRadius(startRadius); saveIniFile(); }
+	float endRadius = g_depthOfFieldController.getDistortionEndRadius();
+	changed = ImGui::DragFloat("Distortion end radius", &endRadius, 0.001f, 0.001f, 1.0f, "%.3f");
+	if(changed) { g_depthOfFieldController.setDistortionEndRadius(endRadius); saveIniFile(); }
+	bool autoFill = g_depthOfFieldController.getDistortionAutoFill();
+	changed = ImGui::Checkbox("Auto fill frame", &autoFill);
+	if(changed) { g_depthOfFieldController.setDistortionAutoFill(autoFill); saveIniFile(); }
+	float fillCrop = g_depthOfFieldController.getDistortionFillCrop();
+	changed = ImGui::DragFloat("Extra fill / crop", &fillCrop, 0.001f, 1.0f, 2.0f, "%.3f");
+	if(changed) { g_depthOfFieldController.setDistortionFillCrop(fillCrop); saveIniFile(); }
+	bool showGuide = g_depthOfFieldController.getDistortionShowGuide();
+	changed = ImGui::Checkbox("Show distortion guide", &showGuide);
+	if(changed) { g_depthOfFieldController.setDistortionShowGuide(showGuide); saveIniFile(); }
+}
+
+ImGui::SeparatorText("Petzval Bokeh");
+bool petzvalEnabled = g_depthOfFieldController.getPetzvalEnabled();
+changed = ImGui::Checkbox("Enable Petzval", &petzvalEnabled);
+if(changed) { g_depthOfFieldController.setPetzvalEnabled(petzvalEnabled); saveIniFile(); }
+if(petzvalEnabled)
+{
+	float v = g_depthOfFieldController.getPetzvalTangential();
+	changed = ImGui::DragFloat("Petzval tangential", &v, 0.01f, -3.0f, 3.0f, "%.2f");
+	if(changed) { g_depthOfFieldController.setPetzvalTangential(v); saveIniFile(); }
+	v = g_depthOfFieldController.getPetzvalSagittal();
+	changed = ImGui::DragFloat("Petzval sagittal", &v, 0.01f, -3.0f, 3.0f, "%.2f");
+	if(changed) { g_depthOfFieldController.setPetzvalSagittal(v); saveIniFile(); }
+	v = g_depthOfFieldController.getPetzvalStrength();
+	changed = ImGui::DragFloat("Petzval strength", &v, 0.01f, 0.0f, 2.0f, "%.2f");
+	if(changed) { g_depthOfFieldController.setPetzvalStrength(v); saveIniFile(); }
+	float center[2] = { g_depthOfFieldController.getPetzvalCenterX(), g_depthOfFieldController.getPetzvalCenterY() };
+	changed = ImGui::DragFloat2("Petzval optical center X / Y", center, 0.001f, 0.0f, 1.0f, "%.3f");
+	if(changed)
+	{
+		g_depthOfFieldController.setPetzvalCenterX(center[0]);
+		g_depthOfFieldController.setPetzvalCenterY(center[1]);
+		saveIniFile();
+	}
+	bool showGuide = g_depthOfFieldController.getPetzvalShowGuide();
+	changed = ImGui::Checkbox("Show Petzval guide", &showGuide);
+	if(changed) { g_depthOfFieldController.setPetzvalShowGuide(showGuide); saveIniFile(); }
+}
+
 							ImGui::SeparatorText("Vignetting");
 							bool vignettingEnabled = g_depthOfFieldController.getVignettingEnabled();
 							changed = ImGui::Checkbox("Enable vignetting", &vignettingEnabled);
@@ -610,6 +728,20 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							{
 								g_depthOfFieldController.setVignettingStrength(vignettingStrength);
 								saveIniFile();
+							}
+							if(vignettingEnabled)
+							{
+								float center[2] = { g_depthOfFieldController.getVignettingCenterX(), g_depthOfFieldController.getVignettingCenterY() };
+								changed = ImGui::DragFloat2("Vignetting center X / Y", center, 0.001f, 0.0f, 1.0f, "%.3f");
+								if(changed)
+								{
+									g_depthOfFieldController.setVignettingCenterX(center[0]);
+									g_depthOfFieldController.setVignettingCenterY(center[1]);
+									saveIniFile();
+								}
+								bool showGuide = g_depthOfFieldController.getVignettingShowGuide();
+								changed = ImGui::Checkbox("Show vignetting guide", &showGuide);
+								if(changed) { g_depthOfFieldController.setVignettingShowGuide(showGuide); saveIniFile(); }
 							}
 
 							ImGui::SeparatorText("Bokeh characteristics");
