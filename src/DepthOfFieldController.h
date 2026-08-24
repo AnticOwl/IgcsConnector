@@ -136,11 +136,6 @@ public:
 		_blurType = newValue;
 		calculateShapePoints();
 	}
-	void setAnamorphicEnabled(bool newValue)
-	{
-		_anamorphicEnabled = newValue;
-		calculateShapePoints();
-	}
 	void setAnamorphicFactor(float newValue)
 	{
 		_anamorphicFactor = IGCS::Utils::clampEx(newValue, 0.01f, 1.0f);
@@ -161,22 +156,41 @@ public:
 		_astigmatismRotation = IGCS::Utils::clampEx(newValue, 0.0f, 180.0f);
 		calculateShapePoints();
 	}
-	void setTiltEnabled(bool newValue)
-	{
-		_tiltEnabled = newValue;
-		calculateShapePoints();
-	}
-	void setTiltAngle(float newValue)
-	{
-		_tiltAngle = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f);
-		calculateShapePoints();
-	}
-	void setTiltRotation(float newValue) { _tiltRotation = IGCS::Utils::clampEx(newValue, 0.0f, 180.0f); }
+	void setTiltEnabled(bool newValue) { _tiltEnabled = newValue; }
+	void setTiltMode(int newValue) { _tiltMode = IGCS::Utils::clampEx(newValue, 0, 2); }
+	void setTiltHorizontal(float newValue) { _tiltHorizontal = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f); }
+	void setTiltVertical(float newValue) { _tiltVertical = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f); }
+	void setTiltCrossSaddle(float newValue) { _tiltCrossSaddle = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f); }
+	void setTiltCrossSaddleRotation(float newValue) { _tiltCrossSaddleRotation = IGCS::Utils::clampEx(newValue, 0.0f, 180.0f); }
+	void setTiltCornerTL(float newValue) { _tiltCornerTL = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f); }
+	void setTiltCornerTR(float newValue) { _tiltCornerTR = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f); }
+	void setTiltCornerBL(float newValue) { _tiltCornerBL = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f); }
+	void setTiltCornerBR(float newValue) { _tiltCornerBR = IGCS::Utils::clampEx(newValue, -45.0f, 45.0f); }
+	void setTiltPivotX(float newValue) { _tiltPivotX = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+	void setTiltPivotY(float newValue) { _tiltPivotY = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+	void setTiltShowOverlay(bool newValue) { _tiltShowOverlay = newValue; }
 	void setTiltTwoPass(bool newValue)
 	{
 		_tiltTwoPass = newValue;
 		calculateShapePoints();
 	}
+	void setDistortionEnabled(bool newValue) { _distortionEnabled = newValue; }
+	void setDistortionShowGuide(bool newValue) { _distortionShowGuide = newValue; }
+	void setDistortionAutoFill(bool newValue) { _distortionAutoFill = newValue; }
+	void setDistortionFillCrop(float newValue) { _distortionFillCrop = IGCS::Utils::clampEx(newValue, 1.0f, 2.0f); }
+	void setDistortionStrength(float newValue) { _distortionStrength = IGCS::Utils::clampEx(newValue, -0.75f, 0.75f); }
+	void setDistortionCurve(float newValue) { _distortionCurve = IGCS::Utils::clampEx(newValue, -0.75f, 0.75f); }
+	void setDistortionCenterX(float newValue) { _distortionCenterX = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+	void setDistortionCenterY(float newValue) { _distortionCenterY = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+	void setDistortionStartRadius(float newValue) { _distortionStartRadius = IGCS::Utils::clampEx(newValue, 0.0f, 0.999f); }
+	void setDistortionEndRadius(float newValue) { _distortionEndRadius = IGCS::Utils::clampEx(newValue, 0.001f, 1.0f); }
+	void setPetzvalEnabled(bool newValue) { _petzvalEnabled = newValue; }
+	void setPetzvalTangential(float newValue) { _petzvalTangential = IGCS::Utils::clampEx(newValue, -3.0f, 3.0f); }
+	void setPetzvalSagittal(float newValue) { _petzvalSagittal = IGCS::Utils::clampEx(newValue, -3.0f, 3.0f); }
+	void setPetzvalStrength(float newValue) { _petzvalStrength = IGCS::Utils::clampEx(newValue, 0.0f, 2.0f); }
+	void setPetzvalCenterX(float newValue) { _petzvalCenterX = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+	void setPetzvalCenterY(float newValue) { _petzvalCenterY = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+	void setPetzvalShowGuide(bool newValue) { _petzvalShowGuide = newValue; }
 	void setVignettingEnabled(bool newValue) { _vignettingEnabled = newValue; }
 	void setVignettingStart(float newValue)
 	{
@@ -195,6 +209,9 @@ public:
 		}
 	}
 	void setVignettingStrength(float newValue) { _vignettingStrength = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+void setVignettingCenterX(float newValue) { _vignettingCenterX = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+void setVignettingCenterY(float newValue) { _vignettingCenterY = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
+void setVignettingShowGuide(bool newValue) { _vignettingShowGuide = newValue; }
 	void setRingAngleOffset(float newValue)
 	{
 		_ringAngleOffset = IGCS::Utils::clampEx(newValue, -2.0f, 2.0f);
@@ -253,19 +270,48 @@ public:
 	bool getRenderPaused() { return _renderPaused; }
 	int getTotalNumberOfStepsToTake() { return _cameraSteps.size(); }
 	bool getShowProgressBarAsOverlay() { return _showProgressBarAsOverlay; }
-	bool getAnamorphicEnabled() { return _anamorphicEnabled; }
 	float getAnamorphicFactor() { return _anamorphicFactor; }
 	bool getAstigmatismEnabled() { return _astigmatismEnabled; }
 	float getAstigmatismStrength() { return _astigmatismStrength; }
 	float getAstigmatismRotation() { return _astigmatismRotation; }
 	bool getTiltEnabled() { return _tiltEnabled; }
-	float getTiltAngle() { return _tiltAngle; }
-	float getTiltRotation() { return _tiltRotation; }
+	int getTiltMode() { return _tiltMode; }
+	float getTiltHorizontal() { return _tiltHorizontal; }
+	float getTiltVertical() { return _tiltVertical; }
+	float getTiltCrossSaddle() { return _tiltCrossSaddle; }
+	float getTiltCrossSaddleRotation() { return _tiltCrossSaddleRotation; }
+	float getTiltCornerTL() { return _tiltCornerTL; }
+	float getTiltCornerTR() { return _tiltCornerTR; }
+	float getTiltCornerBL() { return _tiltCornerBL; }
+	float getTiltCornerBR() { return _tiltCornerBR; }
+	float getTiltPivotX() { return _tiltPivotX; }
+	float getTiltPivotY() { return _tiltPivotY; }
+	bool getTiltShowOverlay() { return _tiltShowOverlay; }
 	bool getTiltTwoPass() { return _tiltTwoPass; }
+	bool getDistortionEnabled() { return _distortionEnabled; }
+	bool getDistortionShowGuide() { return _distortionShowGuide; }
+	bool getDistortionAutoFill() { return _distortionAutoFill; }
+	float getDistortionFillCrop() { return _distortionFillCrop; }
+	float getDistortionStrength() { return _distortionStrength; }
+	float getDistortionCurve() { return _distortionCurve; }
+	float getDistortionCenterX() { return _distortionCenterX; }
+	float getDistortionCenterY() { return _distortionCenterY; }
+	float getDistortionStartRadius() { return _distortionStartRadius; }
+	float getDistortionEndRadius() { return _distortionEndRadius; }
+	bool getPetzvalEnabled() { return _petzvalEnabled; }
+	float getPetzvalTangential() { return _petzvalTangential; }
+	float getPetzvalSagittal() { return _petzvalSagittal; }
+	float getPetzvalStrength() { return _petzvalStrength; }
+	float getPetzvalCenterX() { return _petzvalCenterX; }
+	float getPetzvalCenterY() { return _petzvalCenterY; }
+	bool getPetzvalShowGuide() { return _petzvalShowGuide; }
 	bool getVignettingEnabled() { return _vignettingEnabled; }
 	float getVignettingStart() { return _vignettingStart; }
 	float getVignettingEnd() { return _vignettingEnd; }
 	float getVignettingStrength() { return _vignettingStrength; }
+	float getVignettingCenterX() { return _vignettingCenterX; }
+	float getVignettingCenterY() { return _vignettingCenterY; }
+	bool getVignettingShowGuide() { return _vignettingShowGuide; }
 	float getRingAngleOffset() { return _ringAngleOffset; }
 	float getSphericalAberrationDimFactor() { return _sphericalAberrationDimFactor; }
 	float getFringeIntensity() { return _fringeIntensity; }
@@ -365,19 +411,48 @@ private:
 	int _quality;
 	int _numberOfPointsInnermostRing;
 	float _ringAngleOffset = 0.0f;
-	bool _anamorphicEnabled = true;
 	float _anamorphicFactor = 1.0f;
 	bool _astigmatismEnabled = false;
 	float _astigmatismStrength = 0.0f;
 	float _astigmatismRotation = 0.0f;
 	bool _tiltEnabled = false;
-	float _tiltAngle = 0.0f;
-	float _tiltRotation = 0.0f;
+	int _tiltMode = 0;
+	float _tiltHorizontal = 0.0f;
+	float _tiltVertical = 0.0f;
+	float _tiltCrossSaddle = 0.0f;
+	float _tiltCrossSaddleRotation = 0.0f;
+	float _tiltCornerTL = 0.0f;
+	float _tiltCornerTR = 0.0f;
+	float _tiltCornerBL = 0.0f;
+	float _tiltCornerBR = 0.0f;
+	float _tiltPivotX = 0.5f;
+	float _tiltPivotY = 0.5f;
+	bool _tiltShowOverlay = true;
 	bool _tiltTwoPass = false;
+	bool _distortionEnabled = false;
+	bool _distortionShowGuide = false;
+	bool _distortionAutoFill = true;
+	float _distortionFillCrop = 1.0f;
+	float _distortionStrength = 0.0f;
+	float _distortionCurve = 0.0f;
+	float _distortionCenterX = 0.5f;
+	float _distortionCenterY = 0.5f;
+	float _distortionStartRadius = 0.0f;
+	float _distortionEndRadius = 1.0f;
+	bool _petzvalEnabled = false;
+	float _petzvalTangential = 0.0f;
+	float _petzvalSagittal = 0.0f;
+	float _petzvalStrength = 1.0f;
+	float _petzvalCenterX = 0.5f;
+	float _petzvalCenterY = 0.5f;
+	bool _petzvalShowGuide = false;
 	bool _vignettingEnabled = false;
 	float _vignettingStart = 0.65f;
 	float _vignettingEnd = 1.0f;
 	float _vignettingStrength = 0.5f;
+	float _vignettingCenterX = 0.5f;
+	float _vignettingCenterY = 0.5f;
+	bool _vignettingShowGuide = false;
 	DepthOfFieldRenderOrder _renderOrder = DepthOfFieldRenderOrder::InnerRingToOuterRing;
 	bool _showProgressBarAsOverlay = true;
 	ApertureShapeSettings _apertureShapeSettings;
