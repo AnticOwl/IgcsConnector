@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-optics-ui-test1"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-optics-ui-test2-autofill"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -97,13 +97,28 @@ namespace IgcsDOF
 		ui_tooltip = "Keeps the distortion guide visible during DOF setup. When disabled, the guide still appears automatically while a distortion parameter is being edited.";
 	> = false;
 
+	uniform bool LensDistortionAutoFill <
+		ui_category = "Distortion (TEST)";
+		ui_label = "Auto fill frame";
+		ui_tooltip = "Automatically crops/zooms around the distortion center just enough to keep outward radial distortion from exposing black image borders.";
+	> = true;
+
+	uniform float LensDistortionFillCrop <
+		ui_category = "Distortion (TEST)";
+		ui_label = "Extra fill / crop";
+		ui_type = "drag";
+		ui_min = 1.0; ui_max = 2.0;
+		ui_step = 0.001;
+		ui_tooltip = "Additional crop after automatic frame filling. 1.0 adds no extra crop.";
+	> = 1.0;
+
 	uniform float LensDistortionStrength <
 		ui_category = "Distortion (TEST)";
-		ui_label = "Radial strength";
+		ui_label = "Distortion amount (Pincushion <-> Barrel)";
 		ui_type = "drag";
 		ui_min = -0.75; ui_max = 0.75;
 		ui_step = 0.001;
-		ui_tooltip = "Signed first-order radial distortion. Positive and negative values produce opposite barrel/pincushion directions.";
+		ui_tooltip = "0 is neutral. Negative values move toward pincushion distortion; positive values move toward barrel distortion.";
 	> = 0.0;
 
 	uniform float LensDistortionCurve <
@@ -435,6 +450,36 @@ namespace IgcsDOF
 		return length(p) / max(maxRadius, 1e-5);
 	}
 
+	float distortionFillZoom()
+	{
+		float zoom = max(1.0, LensDistortionFillCrop);
+		if(!LensDistortionAutoFill || !LensDistortionEnabled)
+		{
+			return zoom;
+		}
+
+		const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+		const float2 center = float2(LensDistortionCenterX, LensDistortionCenterY);
+		const float2 aspectScale = float2(screenAspect, 1.0);
+		const float2 c0 = (float2(0.0, 0.0) - center) * aspectScale;
+		const float2 c1 = (float2(1.0, 0.0) - center) * aspectScale;
+		const float2 c2 = (float2(0.0, 1.0) - center) * aspectScale;
+		const float2 c3 = (float2(1.0, 1.0) - center) * aspectScale;
+		const float maxR2 = max(max(dot(c0, c0), dot(c1, c1)), max(dot(c2, c2), dot(c3, c3)));
+
+		// Find the largest outward scale of 1 + S*r^2 + C*r^4 on the radius range.
+		// The Start/End radius ramp is in [0,1], so ignoring it here is conservative:
+		// it can only reduce a positive outward displacement, never increase it.
+		float maxOutwardTerm = max(0.0, LensDistortionStrength * maxR2 + LensDistortionCurve * maxR2 * maxR2);
+		if(LensDistortionCurve < -1e-6)
+		{
+			const float vertexR2 = clamp(-LensDistortionStrength / (2.0 * LensDistortionCurve), 0.0, maxR2);
+			maxOutwardTerm = max(maxOutwardTerm, LensDistortionStrength * vertexR2 + LensDistortionCurve * vertexR2 * vertexR2);
+		}
+
+		return zoom * max(1.0, 1.0 + maxOutwardTerm);
+	}
+
 	float2 applyLensDistortion(float2 uv)
 	{
 		if(!LensDistortionEnabled || (abs(LensDistortionStrength) < 0.000001 && abs(LensDistortionCurve) < 0.000001))
@@ -446,6 +491,10 @@ namespace IgcsDOF
 		const float2 center = float2(LensDistortionCenterX, LensDistortionCenterY);
 		float2 p = uv - center;
 		p.x *= screenAspect;
+
+		// Crop toward the selected optical center before the radial warp. Auto Fill
+		// chooses a conservative zoom that keeps outward barrel distortion in-frame.
+		p /= distortionFillZoom();
 
 		const float r2 = dot(p, p);
 		const float radius01 = distortionRadius01(uv);
@@ -623,9 +672,9 @@ namespace IgcsDOF
 		}
 
 		// Visible uniforms are 1-based in ReShade's overlay_active source.
-		// Distortion occupies slots 6..13 in this shader. This mirrors Marty's
-		// edit-time focus helper behavior without changing any distortion math.
-		const bool distortionGuideEditing = OVERLAY_OPEN && ACTIVE_VARIABLE >= 6 && ACTIVE_VARIABLE <= 13;
+		// Distortion occupies slots 6..15 in this shader. This mirrors Marty's
+		// edit-time focus helper behavior without changing the optical effect math.
+		const bool distortionGuideEditing = OVERLAY_OPEN && ACTIVE_VARIABLE >= 6 && ACTIVE_VARIABLE <= 15;
 		if(SessionState==2 && LensDistortionEnabled && !SCREENSHOT && (LensDistortionShowGuide || distortionGuideEditing))
 		{
 			const float2 center = float2(LensDistortionCenterX, LensDistortionCenterY);
