@@ -5,6 +5,8 @@ on:
     branches: [ astigmatism ]
     paths:
       - '.github/workflows/apply-optics.yml'
+  pull_request:
+    branches: [ astigmatism ]
 
 permissions:
   contents: write
