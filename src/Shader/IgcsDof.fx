@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-optics-ui-test2-autofill"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-overlay-test1"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -84,6 +84,12 @@ namespace IgcsDOF
 		ui_label = "Two-pass (+Tilt / -Tilt)";
 		ui_tooltip = "Runs the complete camera sample sequence with +Tilt, then repeats the same XYZ sequence with -Tilt. Render time is approximately doubled.";
 	> = false;
+
+	uniform bool TiltedFocusPlaneShowOverlay <
+		ui_category = "Tilt (TEST)";
+		ui_label = "Show tilt overlay";
+		ui_tooltip = "Shows the focus-plane direction directly over the setup image. Red is nearer, blue is deeper. The overlay is never included in screenshots.";
+	> = true;
 
 	uniform bool LensDistortionEnabled <
 		ui_category = "Distortion (TEST)";
@@ -671,10 +677,67 @@ namespace IgcsDOF
 			}
 		}
 
+		// Lightweight in-game Tilt visualization. It intentionally does not alter the
+		// validated tilt math: it only visualizes the current angle/rotation over the setup image.
+		// Red = nearer, blue = deeper, neutral = current focus pivot.
+		const bool tiltGuideEditing = OVERLAY_OPEN && ACTIVE_VARIABLE >= 2 && ACTIVE_VARIABLE <= 6;
+		if(SessionState==2 && TiltedFocusPlaneEnabled && !SCREENSHOT && (TiltedFocusPlaneShowOverlay || tiltGuideEditing))
+		{
+			const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+			const float2 pivot = float2(0.5, 0.5);
+			const float rotationRadians = radians(TiltedFocusPlaneRotation);
+			float2 deepAxis = float2(cos(rotationRadians), sin(rotationRadians));
+			deepAxis *= TiltedFocusPlaneAngle < 0.0 ? -1.0 : 1.0;
+
+			float2 planePos = texcoord - pivot;
+			planePos.x *= screenAspect;
+			const float signedDepth = dot(planePos, deepAxis);
+			const float tiltAmount = saturate(abs(TiltedFocusPlaneAngle) / 45.0);
+			const float tintAmount = 0.11 * tiltAmount * smoothstep(0.02, 0.65, abs(signedDepth));
+			const float3 depthColor = signedDepth >= 0.0 ? float3(0.12, 0.42, 1.0) : float3(1.0, 0.16, 0.10);
+			fragment = lerp(fragment, depthColor, tintAmount);
+
+			// Handle points toward the deeper side. Distance from the pivot represents tilt strength.
+			const float handleDistance = lerp(0.055, 0.33, tiltAmount);
+			const float2 handle = pivot + float2(deepAxis.x / screenAspect, deepAxis.y) * handleDistance;
+			const float pxAspect = BUFFER_PIXEL_SIZE.y;
+			float2 pAspect = (texcoord - pivot) * float2(screenAspect, 1.0);
+			float2 hAspect = (handle - pivot) * float2(screenAspect, 1.0);
+			const float hLen2 = max(dot(hAspect, hAspect), 1e-8);
+			const float lineT = saturate(dot(pAspect, hAspect) / hLen2);
+			const float lineDistance = length(pAspect - hAspect * lineT);
+			const bool onGuideLine = tiltAmount > 0.001 && lineT > 0.03 && lineT < 0.96 && lineDistance <= 1.25 * pxAspect;
+
+			const float2 handleDelta = (texcoord - handle) * float2(screenAspect, 1.0);
+			const float handleRadius = 9.0 * pxAspect;
+			const float handleRing = abs(length(handleDelta) - handleRadius);
+			const bool onHandle = tiltAmount > 0.001 && handleRing <= 1.8 * pxAspect;
+
+			const float pivotHalfX = 13.0 * BUFFER_PIXEL_SIZE.x;
+			const float pivotHalfY = 13.0 * BUFFER_PIXEL_SIZE.y;
+			const bool pivotV = abs(texcoord.x - pivot.x) <= 1.35 * BUFFER_PIXEL_SIZE.x && abs(texcoord.y - pivot.y) <= pivotHalfY;
+			const bool pivotH = abs(texcoord.y - pivot.y) <= 1.35 * BUFFER_PIXEL_SIZE.y && abs(texcoord.x - pivot.x) <= pivotHalfX;
+			const float pivotRingDistance = length((texcoord - pivot) * float2(screenAspect, 1.0));
+			const bool pivotRing = abs(pivotRingDistance - 10.0 * pxAspect) <= 1.15 * pxAspect;
+
+			if(onGuideLine)
+			{
+				fragment = lerp(fragment, float3(0.72, 0.82, 1.0), 0.70);
+			}
+			if(onHandle)
+			{
+				fragment = lerp(fragment, float3(0.18, 0.58, 1.0), 0.96);
+			}
+			if(pivotV || pivotH || pivotRing)
+			{
+				fragment = lerp(fragment, float3(0.92, 0.92, 0.92), 0.92);
+			}
+		}
+
 		// Visible uniforms are 1-based in ReShade's overlay_active source.
-		// Distortion occupies slots 6..15 in this shader. This mirrors Marty's
+		// Distortion occupies slots 7..16 in this shader. This mirrors Marty's
 		// edit-time focus helper behavior without changing the optical effect math.
-		const bool distortionGuideEditing = OVERLAY_OPEN && ACTIVE_VARIABLE >= 6 && ACTIVE_VARIABLE <= 15;
+		const bool distortionGuideEditing = OVERLAY_OPEN && ACTIVE_VARIABLE >= 7 && ACTIVE_VARIABLE <= 16;
 		if(SessionState==2 && LensDistortionEnabled && !SCREENSHOT && (LensDistortionShowGuide || distortionGuideEditing))
 		{
 			const float2 center = float2(LensDistortionCenterX, LensDistortionCenterY);
