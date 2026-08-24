@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-test5-true-two-pass"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-optics-ui-test1"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -93,9 +93,9 @@ namespace IgcsDOF
 
 	uniform bool LensDistortionShowGuide <
 		ui_category = "Distortion (TEST)";
-		ui_label = "Show center / radius guide";
-		ui_tooltip = "Shows a crosshair at the distortion center plus the start and end radii during DOF setup.";
-	> = true;
+		ui_label = "Always show center / radius guide";
+		ui_tooltip = "Keeps the distortion guide visible during DOF setup. When disabled, the guide still appears automatically while a distortion parameter is being edited.";
+	> = false;
 
 	uniform float LensDistortionStrength <
 		ui_category = "Distortion (TEST)";
@@ -170,6 +170,12 @@ namespace IgcsDOF
 		ui_min = 0.0; ui_max = 1.0;
 		ui_step = 0.001;
 	> = 0.5;
+
+	// ReShade overlay state. The same mechanism is used by Marty's focus helper:
+	// the guide can appear only while its UI controls are actively edited.
+	uniform bool OVERLAY_OPEN < source = "overlay_open"; >;
+	uniform int ACTIVE_VARIABLE < source = "overlay_active"; >;
+	uniform bool SCREENSHOT < source = "screenshot"; >;
 
 	// ------------------------------
 	// Hidden values, set by the connector
@@ -616,7 +622,11 @@ namespace IgcsDOF
 			}
 		}
 
-		if(SessionState==2 && LensDistortionEnabled && LensDistortionShowGuide)
+		// Visible uniforms are 1-based in ReShade's overlay_active source.
+		// Distortion occupies slots 6..13 in this shader. This mirrors Marty's
+		// edit-time focus helper behavior without changing any distortion math.
+		const bool distortionGuideEditing = OVERLAY_OPEN && ACTIVE_VARIABLE >= 6 && ACTIVE_VARIABLE <= 13;
+		if(SessionState==2 && LensDistortionEnabled && !SCREENSHOT && (LensDistortionShowGuide || distortionGuideEditing))
 		{
 			const float2 center = float2(LensDistortionCenterX, LensDistortionCenterY);
 			const float radius01 = distortionRadius01(texcoord);
