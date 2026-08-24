@@ -20,23 +20,54 @@ jobs:
           ref: astigmatism
           fetch-depth: 0
 
-      - name: Reconstruct patch and shader
+      - name: Reconstruct and apply integration
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import base64, gzip
-          patch = gzip.decompress(base64.b64decode(Path('.github/optics/patch.gz.b64').read_text().strip()))
-          shader = gzip.decompress(base64.b64decode(Path('.github/optics/shader.gz.b64').read_text().strip()))
-          Path('/tmp/IGCSDOF_Optics_Addon_Clean.patch').write_bytes(patch)
-          Path('src/Shader/IgcsDof.fx').write_bytes(shader)
-          PY
+          import base64, gzip, re
 
-      - name: Apply addon patch
-        shell: bash
-        run: |
-          git apply --check /tmp/IGCSDOF_Optics_Addon_Clean.patch
-          git apply /tmp/IGCSDOF_Optics_Addon_Clean.patch
+          patch = gzip.decompress(base64.b64decode(Path('.github/optics/patch.gz.b64').read_text().strip())).decode('utf-8')
+          shader = gzip.decompress(base64.b64decode(Path('.github/optics/shader.gz.b64').read_text().strip()))
+          Path('src/Shader/IgcsDof.fx').write_bytes(shader)
+
+          # The prepared patch intentionally stores context hunks without line numbers.
+          # Apply each hunk by exact old-text replacement so this is deterministic
+          # against the frozen b09212d base.
+          file_blocks = re.split(r'(?=^diff --git )', patch, flags=re.M)
+          changed = []
+          for block in file_blocks:
+              if not block.startswith('diff --git '):
+                  continue
+              m = re.match(r'diff --git a/(\S+) b/(\S+)\n', block)
+              if not m:
+                  raise RuntimeError('Could not parse file header')
+              path = Path(m.group(2))
+              body = block[m.end():]
+              # Strip --- / +++ file headers.
+              body = re.sub(r'^--- .*\n^\+\+\+ .*\n', '', body, count=1, flags=re.M)
+              hunks = body.split('@@')
+              text = path.read_text(encoding='utf-8')
+              hunk_count = 0
+              for hunk in hunks:
+                  if not hunk.strip():
+                      continue
+                  lines = hunk.splitlines(keepends=True)
+                  old = ''.join(line[1:] for line in lines if line.startswith((' ', '-')))
+                  new = ''.join(line[1:] for line in lines if line.startswith((' ', '+')))
+                  if not old:
+                      continue
+                  if old not in text:
+                      preview = old[:180].replace('\n', '\\n')
+                      raise RuntimeError(f'Hunk not found in {path}: {preview}')
+                  text = text.replace(old, new, 1)
+                  hunk_count += 1
+              if hunk_count == 0:
+                  raise RuntimeError(f'No hunks applied to {path}')
+              path.write_text(text, encoding='utf-8')
+              changed.append(str(path))
+          print('Applied:', ', '.join(changed))
+          PY
 
       - name: Validate integration
         shell: bash
@@ -50,6 +81,7 @@ jobs:
           grep -q 'getTiltMode' src/DepthOfFieldController.h
           grep -q 'PetzvalEnabled' src/DepthOfFieldController.cpp
           grep -q 'Tilt mode' src/Main.cpp
+          git diff --check
 
       - name: Commit clean integration
         shell: bash
