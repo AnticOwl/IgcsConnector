@@ -1,0 +1,48 @@
+name: Apply live vignetting uniforms
+
+on:
+  push:
+    branches:
+      - optics-integration-trigger-20260824
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Trigger live vignetting uniforms'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: optics-integration-trigger-20260824
+          fetch-depth: 0
+      - name: Push vignetting controls live to shader
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/Main.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          start_marker = 'ImGui::SeparatorText("Vignetting");'
+          end_marker = 'ImGui::SeparatorText("Bokeh characteristics");'
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+
+          block = text[start:end]
+          old = 'saveIniFile();'
+          replacement = 'g_depthOfFieldController.writeVariableStateToShader(runtime);\n\t\t\t\t\t\t\t\tsaveIniFile();'
+          count = block.count(old)
+          if count < 5:
+              raise SystemExit(f'Unexpected Vignetting block: found only {count} saveIniFile calls')
+          block = block.replace(old, replacement)
+          text = text[:start] + block + text[end:]
+          path.write_text(text, encoding='utf-8')
+
+      - name: Commit live vignetting update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Main.cpp
+          git commit -m "Update vignetting uniforms live"
+          git push origin HEAD:optics-integration-trigger-20260824
