@@ -703,6 +703,7 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(changed)
 							{
 								g_depthOfFieldController.setVignettingEnabled(vignettingEnabled);
+								g_depthOfFieldController.writeVariableStateToShader(runtime);
 								saveIniFile();
 							}
 							float vignettingStart = g_depthOfFieldController.getVignettingStart();
@@ -711,6 +712,7 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(changed)
 							{
 								g_depthOfFieldController.setVignettingStart(vignettingStart);
+								g_depthOfFieldController.writeVariableStateToShader(runtime);
 								saveIniFile();
 							}
 							float vignettingEnd = g_depthOfFieldController.getVignettingEnd();
@@ -719,6 +721,7 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(changed)
 							{
 								g_depthOfFieldController.setVignettingEnd(vignettingEnd);
+								g_depthOfFieldController.writeVariableStateToShader(runtime);
 								saveIniFile();
 							}
 										float vignettingStrength = g_depthOfFieldController.getVignettingStrength();
@@ -727,7 +730,8 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(changed)
 							{
 												g_depthOfFieldController.setVignettingStrength(vignettingStrength);
-												saveIniFile();
+												g_depthOfFieldController.writeVariableStateToShader(runtime);
+								saveIniFile();
 											}
 											if(vignettingEnabled)
 											{
@@ -737,11 +741,13 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 												{
 													g_depthOfFieldController.setVignettingCenterX(center[0]);
 													g_depthOfFieldController.setVignettingCenterY(center[1]);
-													saveIniFile();
+													g_depthOfFieldController.writeVariableStateToShader(runtime);
+								saveIniFile();
 												}
 												bool showGuide = g_depthOfFieldController.getVignettingShowGuide();
 												changed = ImGui::Checkbox("Show vignetting guide", &showGuide);
-												if(changed) { g_depthOfFieldController.setVignettingShowGuide(showGuide); saveIniFile(); }
+												if(changed) { g_depthOfFieldController.setVignettingShowGuide(showGuide); g_depthOfFieldController.writeVariableStateToShader(runtime);
+								saveIniFile(); }
 											}
 
 							ImGui::SeparatorText("Bokeh characteristics");
