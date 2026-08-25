@@ -653,8 +653,9 @@ namespace IgcsDOF
 			result.rgb *= cateyeMask;
 			result.a *= CateyeVignette ? 1 : cateyeMask;
 
-			// Independent radial vignetting. This deliberately does not use apertureSample,
-			// so Cat Eye / pupil clipping cannot dictate the vignetting shape.
+			// Optical vignetting adapted from Marty McFly / Pascal Gilcher's qUINT ADOF model.
+			// Keep our Start/End/Strength/Center controls, but use Marty's soft quadratic
+			// aperture-sample weighting instead of a hard pupil clip or simple screen darkening.
 			if(VignettingEnabled)
 			{
 				float2 lensOffset = (warpedUv - float2(VignettingCenterX, VignettingCenterY)) * 2.0;
@@ -663,7 +664,16 @@ namespace IgcsDOF
 
 				float vignetteRadius = length(lensOffset);
 				float vignetteFalloff = linearstep(VignettingStart, VignettingEnd, vignetteRadius);
-				float vignetteMask = saturate(1.0 - vignetteFalloff * VignettingStrength);
+				float vignetteAmount = pow(saturate(vignetteFalloff), 0.75) * VignettingStrength;
+				float2 centerVec = vignetteRadius > 1e-6
+					? (lensOffset / vignetteRadius) * vignetteAmount
+					: float2(0.0, 0.0);
+
+				float2 vignetteSample = apertureSample - centerVec;
+				float vignetteMask = saturate(3.333 - dot(vignetteSample, vignetteSample) * 1.666);
+
+				// Keep alpha untouched so rejected optical samples reduce light instead of
+				// being normalized away during accumulation.
 				result.rgb *= vignetteMask;
 			}
 			
