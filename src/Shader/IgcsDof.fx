@@ -664,7 +664,7 @@ namespace IgcsDOF
 
 				float vignetteRadius = length(lensOffset);
 				float vignetteFalloff = linearstep(VignettingStart, VignettingEnd, vignetteRadius);
-				float vignetteAmount = pow(saturate(vignetteFalloff), 0.75) * VignettingStrength;
+				float vignetteAmount = pow(saturate(vignetteFalloff), 0.75) * VignettingStrength * 3.0;
 				float2 centerVec = vignetteRadius > 1e-6
 					? (lensOffset / vignetteRadius) * vignetteAmount
 					: float2(0.0, 0.0);
