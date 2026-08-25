@@ -1,0 +1,83 @@
+name: Increase Petzval addon range
+
+on:
+  push:
+    branches: [ optics-integration-trigger-20260824 ]
+    paths:
+      - '.github/workflows/stronger-petzval.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: optics-integration-trigger-20260824
+          fetch-depth: 0
+
+      - name: Increase Petzval ranges in addon only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              'src/DepthOfFieldController.h': [
+                  ('void setPetzvalTangential(float newValue) { _petzvalTangential = IGCS::Utils::clampEx(newValue, -3.0f, 3.0f); }',
+                   'void setPetzvalTangential(float newValue) { _petzvalTangential = IGCS::Utils::clampEx(newValue, -6.0f, 6.0f); }'),
+                  ('void setPetzvalSagittal(float newValue) { _petzvalSagittal = IGCS::Utils::clampEx(newValue, -3.0f, 3.0f); }',
+                   'void setPetzvalSagittal(float newValue) { _petzvalSagittal = IGCS::Utils::clampEx(newValue, -6.0f, 6.0f); }'),
+                  ('void setPetzvalStrength(float newValue) { _petzvalStrength = IGCS::Utils::clampEx(newValue, 0.0f, 2.0f); }',
+                   'void setPetzvalStrength(float newValue) { _petzvalStrength = IGCS::Utils::clampEx(newValue, 0.0f, 5.0f); }'),
+              ],
+              'src/DepthOfFieldController.cpp': [
+                  ('_petzvalTangential = IGCS::Utils::clampEx(_petzvalTangential, -3.0f, 3.0f);',
+                   '_petzvalTangential = IGCS::Utils::clampEx(_petzvalTangential, -6.0f, 6.0f);'),
+                  ('_petzvalSagittal = IGCS::Utils::clampEx(_petzvalSagittal, -3.0f, 3.0f);',
+                   '_petzvalSagittal = IGCS::Utils::clampEx(_petzvalSagittal, -6.0f, 6.0f);'),
+                  ('_petzvalStrength = IGCS::Utils::clampEx(_petzvalStrength, 0.0f, 2.0f);',
+                   '_petzvalStrength = IGCS::Utils::clampEx(_petzvalStrength, 0.0f, 5.0f);'),
+              ],
+              'src/Main.cpp': [
+                  ('ImGui::DragFloat("Petzval tangential", &v, 0.01f, -3.0f, 3.0f, "%.2f")',
+                   'ImGui::DragFloat("Petzval tangential", &v, 0.01f, -6.0f, 6.0f, "%.2f")'),
+                  ('ImGui::DragFloat("Petzval sagittal", &v, 0.01f, -3.0f, 3.0f, "%.2f")',
+                   'ImGui::DragFloat("Petzval sagittal", &v, 0.01f, -6.0f, 6.0f, "%.2f")'),
+                  ('ImGui::DragFloat("Petzval strength", &v, 0.01f, 0.0f, 2.0f, "%.2f")',
+                   'ImGui::DragFloat("Petzval strength", &v, 0.01f, 0.0f, 5.0f, "%.2f")'),
+              ],
+          }
+
+          for filename, pairs in replacements.items():
+              p = Path(filename)
+              text = p.read_text()
+              for old, new in pairs:
+                  if old not in text:
+                      raise SystemExit(f'Expected Petzval line not found in {filename}: {old}')
+                  text = text.replace(old, new, 1)
+              p.write_text(text)
+          PY
+
+      - name: Validate addon-only change
+        shell: bash
+        run: |
+          grep -q 'setPetzvalTangential.*-6.0f, 6.0f' src/DepthOfFieldController.h
+          grep -q 'setPetzvalSagittal.*-6.0f, 6.0f' src/DepthOfFieldController.h
+          grep -q 'setPetzvalStrength.*0.0f, 5.0f' src/DepthOfFieldController.h
+          grep -q 'Petzval tangential.*-6.0f, 6.0f' src/Main.cpp
+          grep -q 'Petzval sagittal.*-6.0f, 6.0f' src/Main.cpp
+          grep -q 'Petzval strength.*0.0f, 5.0f' src/Main.cpp
+          git diff --exit-code -- src/Shader/IgcsDof.fx
+
+      - name: Commit addon change
+        shell: bash
+        run: |
+          rm -f .github/workflows/stronger-petzval.yml
+          git config user.name 'AnticOwl'
+          git config user.email '76813232+AnticOwl@users.noreply.github.com'
+          git add -A
+          git commit -m 'Increase Petzval effect range in addon'
+          git push origin HEAD:optics-integration-trigger-20260824
