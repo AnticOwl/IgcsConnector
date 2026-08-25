@@ -653,7 +653,8 @@ namespace IgcsDOF
 			result.rgb *= cateyeMask;
 			result.a *= CateyeVignette ? 1 : cateyeMask;
 
-			// Preserve validated render-time vignetting math.
+			// Independent radial vignetting. This deliberately does not use apertureSample,
+			// so Cat Eye / pupil clipping cannot dictate the vignetting shape.
 			if(VignettingEnabled)
 			{
 				float2 lensOffset = (warpedUv - float2(VignettingCenterX, VignettingCenterY)) * 2.0;
@@ -661,11 +662,8 @@ namespace IgcsDOF
 				lensOffset /= length(float2(rcp(BUFFER_WIDTH * BUFFER_RCP_HEIGHT), 1.0));
 
 				float vignetteRadius = length(lensOffset);
-				float2 radialDirection = vignetteRadius > 1e-6 ? lensOffset / vignetteRadius : float2(0.0, 0.0);
 				float vignetteFalloff = linearstep(VignettingStart, VignettingEnd, vignetteRadius);
-				float pupilShift = vignetteFalloff * VignettingStrength * sqrt(2.0);
-				float2 vignetteSample = apertureSample + radialDirection * pupilShift;
-				float vignetteMask = smoothstep(1.0, 0.98, length(vignetteSample));
+				float vignetteMask = saturate(1.0 - vignetteFalloff * VignettingStrength);
 				result.rgb *= vignetteMask;
 			}
 			
