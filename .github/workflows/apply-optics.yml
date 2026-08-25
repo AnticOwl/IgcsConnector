@@ -2,11 +2,11 @@ name: Apply optics integration
 
 on:
   push:
-    branches: [ astigmatism ]
+    branches: [ optics-integration-trigger-20260824 ]
     paths:
       - '.github/workflows/apply-optics.yml'
   pull_request:
-    branches: [ astigmatism ]
+    branches: [ optics-integration-trigger-20260824 ]
 
 permissions:
   contents: write
@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: astigmatism
+          ref: optics-integration-trigger-20260824
           fetch-depth: 0
 
       - name: Reconstruct patch and shader
@@ -35,8 +35,67 @@ jobs:
       - name: Apply addon patch
         shell: bash
         run: |
-          git apply --check /tmp/IGCSDOF_Optics_Addon_Clean.patch
-          git apply /tmp/IGCSDOF_Optics_Addon_Clean.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          patch_lines = Path('/tmp/IGCSDOF_Optics_Addon_Clean.patch').read_text().splitlines()
+          i = 0
+          while i < len(patch_lines):
+              if not patch_lines[i].startswith('diff --git '):
+                  i += 1
+                  continue
+              path = patch_lines[i].split()[2][2:]
+              i += 1
+              while i < len(patch_lines) and not patch_lines[i].startswith('@@') and not patch_lines[i].startswith('diff --git '):
+                  i += 1
+
+              hunks = []
+              while i < len(patch_lines) and not patch_lines[i].startswith('diff --git '):
+                  if not patch_lines[i].startswith('@@'):
+                      i += 1
+                      continue
+                  i += 1
+                  old, new = [], []
+                  while i < len(patch_lines) and not patch_lines[i].startswith('@@') and not patch_lines[i].startswith('diff --git '):
+                      line = patch_lines[i]
+                      if line.startswith('-'):
+                          old.append(line[1:])
+                      elif line.startswith('+'):
+                          new.append(line[1:])
+                      elif line.startswith(' '):
+                          old.append(line[1:]); new.append(line[1:])
+                      elif not line.startswith('\\'):
+                          old.append(line); new.append(line)
+                      i += 1
+                  hunks.append((old, new))
+
+              p = Path(path)
+              src = p.read_text().splitlines()
+              for n, (old, new) in enumerate(hunks, 1):
+                  old_norm = [x.strip() for x in old]
+                  found = -1
+                  for pos in range(0, len(src) - len(old) + 1):
+                      if [x.strip() for x in src[pos:pos+len(old)]] == old_norm:
+                          found = pos
+                          break
+                  if found < 0:
+                      raise SystemExit(f'Cannot locate hunk {n} in {path}: {old_norm[:3]}')
+
+                  indent = ''
+                  if old:
+                      first_original = src[found]
+                      indent = first_original[:len(first_original)-len(first_original.lstrip())]
+                  new_lines = []
+                  for line in new:
+                      if line.strip() == '':
+                          new_lines.append('')
+                      else:
+                          patch_indent = line[:len(line)-len(line.lstrip())]
+                          # Keep patch-relative indentation but anchor it to the matched block.
+                          new_lines.append(indent + patch_indent + line.lstrip())
+                  src[found:found+len(old)] = new_lines
+              p.write_text('\n'.join(src) + '\n')
+          PY
 
       - name: Validate integration
         shell: bash
@@ -60,4 +119,4 @@ jobs:
           git config user.email '76813232+AnticOwl@users.noreply.github.com'
           git add -A
           git commit -m 'Integrate optics controls into addon'
-          git push origin HEAD:astigmatism
+          git push origin HEAD:optics-integration-trigger-20260824
