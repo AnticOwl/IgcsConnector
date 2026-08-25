@@ -73,9 +73,6 @@ void DepthOfFieldController::setXFocusDelta(reshade::api::effect_runtime* runtim
 	_focusDelta = newValueX;
 	calculateShapePoints();
 	setUniformFloatVariable(runtime, "FocusDelta", _focusDelta);
-	setUniformBoolVariable(runtime, "AstigmatismEnabled", _astigmatismEnabled);
-	setUniformFloatVariable(runtime, "AstigmatismStrength", _astigmatismStrength);
-	setUniformFloatVariable(runtime, "AstigmatismRotation", _astigmatismRotation);
 }
 
 
@@ -111,6 +108,9 @@ void DepthOfFieldController::writeVariableStateToShader(reshade::api::effect_run
 
 	setUniformIntVariable(runtime, "SessionState", (int)_state);
 	setUniformFloatVariable(runtime, "FocusDelta", _focusDelta);
+	setUniformBoolVariable(runtime, "AstigmatismEnabled", _astigmatismEnabled);
+	setUniformFloatVariable(runtime, "AstigmatismStrength", _astigmatismStrength);
+	setUniformFloatVariable(runtime, "AstigmatismRotation", _astigmatismRotation);
 	setUniformBoolVariable(runtime, "BlendFrame", _blendFrame);
 	setUniformFloatVariable(runtime, "BlendFactor", _blendFactor);
 		setUniformFloat2Variable(runtime, "AlignmentDelta", _xAlignmentDelta, _yAlignmentDelta);
