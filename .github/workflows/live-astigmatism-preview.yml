@@ -22,7 +22,6 @@ jobs:
         run: |
           from pathlib import Path
 
-          # Shader: hidden preview state + setup-time astigmatism transform only.
           path = Path('src/Shader/IgcsDof.fx')
           text = path.read_text(encoding='utf-8')
 
@@ -36,29 +35,24 @@ jobs:
               text = text.replace(marker, insert + marker, 1)
 
           fn_marker = '\tfloat2 applyTiltedFocusPlane(float2 uv, float2 alignment)\n'
-          fn = r'''	float2 applyAstigmatismSetupPreview(float2 alignment)
-	{
-		if(!AstigmatismEnabled || AstigmatismStrength <= 0.0001)
-		{
-			return alignment;
-		}
-
-		const float angle = radians(AstigmatismRotation);
-		const float c = cos(angle);
-		const float s = sin(angle);
-		const float localX = alignment.x * c + alignment.y * s;
-		const float localY = -alignment.x * s + alignment.y * c;
-
-		const float axisSplit = 0.5 * AstigmatismStrength;
-		const float focusedLocalX = localX * (1.0 + axisSplit);
-		const float focusedLocalY = localY * (1.0 - axisSplit);
-
-		return float2(
-			focusedLocalX * c - focusedLocalY * s,
-			focusedLocalX * s + focusedLocalY * c);
-	}
-
-'''
+          fn = ('\tfloat2 applyAstigmatismSetupPreview(float2 alignment)\n'
+                '\t{\n'
+                '\t\tif(!AstigmatismEnabled || AstigmatismStrength <= 0.0001)\n'
+                '\t\t{\n'
+                '\t\t\treturn alignment;\n'
+                '\t\t}\n\n'
+                '\t\tconst float angle = radians(AstigmatismRotation);\n'
+                '\t\tconst float c = cos(angle);\n'
+                '\t\tconst float s = sin(angle);\n'
+                '\t\tconst float localX = alignment.x * c + alignment.y * s;\n'
+                '\t\tconst float localY = -alignment.x * s + alignment.y * c;\n\n'
+                '\t\tconst float axisSplit = 0.5 * AstigmatismStrength;\n'
+                '\t\tconst float focusedLocalX = localX * (1.0 + axisSplit);\n'
+                '\t\tconst float focusedLocalY = localY * (1.0 - axisSplit);\n\n'
+                '\t\treturn float2(\n'
+                '\t\t\tfocusedLocalX * c - focusedLocalY * s,\n'
+                '\t\t\tfocusedLocalX * s + focusedLocalY * c);\n'
+                '\t}\n\n')
           if 'float2 applyAstigmatismSetupPreview(float2 alignment)' not in text:
               if fn_marker not in text:
                   raise SystemExit('Astigmatism function insertion marker not found')
@@ -71,10 +65,8 @@ jobs:
               text = text.replace(old_setup, new_setup, 1)
           elif new_setup not in text:
               raise SystemExit('Setup alignment marker not found')
-
           path.write_text(text, encoding='utf-8')
 
-          # Controller: push astigmatism state to hidden shader uniforms.
           path = Path('src/DepthOfFieldController.cpp')
           text = path.read_text(encoding='utf-8')
           marker = '\tsetUniformFloatVariable(runtime, "FocusDelta", _focusDelta);\n'
@@ -87,7 +79,6 @@ jobs:
               text = text.replace(marker, marker + insert, 1)
           path.write_text(text, encoding='utf-8')
 
-          # Addon UI: update shader immediately while editing astigmatism controls.
           path = Path('src/Main.cpp')
           text = path.read_text(encoding='utf-8')
           start_marker = 'ImGui::SeparatorText("Astigmatism");'
@@ -95,7 +86,6 @@ jobs:
           start = text.index(start_marker)
           end = text.index(end_marker, start)
           block = text[start:end]
-
           old = 'saveIniFile();'
           replacement = 'g_depthOfFieldController.writeVariableStateToShader(runtime);\n\t\t\t\t\t\t\t\tsaveIniFile();'
           count = block.count(old)
