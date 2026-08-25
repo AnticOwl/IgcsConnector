@@ -1,0 +1,57 @@
+name: Amplify Petzval effect
+
+on:
+  push:
+    branches: [ optics-integration-trigger-20260824 ]
+    paths:
+      - '.github/workflows/amplify-petzval.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  amplify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: optics-integration-trigger-20260824
+          fetch-depth: 0
+
+      - name: Amplify Petzval backend
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/Shader/IgcsDof.fx')
+          s = p.read_text()
+          old = '''\t\tconst float radialScale = max(0.10, 1.0 + edgeAmount * PetzvalSagittal * PetzvalStrength);\n\t\tconst float tangentScale = max(0.10, 1.0 + edgeAmount * PetzvalTangential * PetzvalStrength);'''
+          new = '''\t\t// Amplify the existing Petzval model without changing its controls or UI.\n\t\tconst float petzvalGain = PetzvalStrength * 3.0;\n\t\tconst float radialScale = max(0.10, 1.0 + edgeAmount * PetzvalSagittal * petzvalGain);\n\t\tconst float tangentScale = max(0.10, 1.0 + edgeAmount * PetzvalTangential * petzvalGain);'''
+          if old not in s:
+              raise SystemExit('Petzval scale block not found')
+          s = s.replace(old, new, 1)
+
+          old2 = '''\t\tconst float anisotropy = saturate(edgeAmount *\n\t\t\tmax(abs(PetzvalTangential), abs(PetzvalSagittal)) *\n\t\t\tPetzvalStrength);'''
+          new2 = '''\t\tconst float anisotropy = saturate(edgeAmount *\n\t\t\tmax(abs(PetzvalTangential), abs(PetzvalSagittal)) *\n\t\t\tpetzvalGain);'''
+          if old2 not in s:
+              raise SystemExit('Petzval anisotropy block not found')
+          s = s.replace(old2, new2, 1)
+          p.write_text(s)
+          PY
+
+      - name: Validate hidden addon-controlled Petzval
+        shell: bash
+        run: |
+          grep -q 'uniform bool PetzvalBokehEnabled < hidden=true;' src/Shader/IgcsDof.fx
+          grep -q 'const float petzvalGain = PetzvalStrength \* 3.0;' src/Shader/IgcsDof.fx
+          ! grep -q 'ui_category = "Petzval' src/Shader/IgcsDof.fx
+
+      - name: Commit amplified Petzval
+        shell: bash
+        run: |
+          rm -f .github/workflows/amplify-petzval.yml
+          git config user.name 'AnticOwl'
+          git config user.email '76813232+AnticOwl@users.noreply.github.com'
+          git add -A
+          git commit -m 'Amplify Petzval bokeh effect'
+          git push origin HEAD:optics-integration-trigger-20260824
