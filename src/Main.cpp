@@ -676,13 +676,13 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 										if(petzvalEnabled)
 										{
 											float v = g_depthOfFieldController.getPetzvalTangential();
-											changed = ImGui::DragFloat("Petzval tangential", &v, 0.01f, -3.0f, 3.0f, "%.2f");
+											changed = ImGui::DragFloat("Petzval tangential", &v, 0.01f, -6.0f, 6.0f, "%.2f");
 											if(changed) { g_depthOfFieldController.setPetzvalTangential(v); saveIniFile(); }
 											v = g_depthOfFieldController.getPetzvalSagittal();
-											changed = ImGui::DragFloat("Petzval sagittal", &v, 0.01f, -3.0f, 3.0f, "%.2f");
+											changed = ImGui::DragFloat("Petzval sagittal", &v, 0.01f, -6.0f, 6.0f, "%.2f");
 											if(changed) { g_depthOfFieldController.setPetzvalSagittal(v); saveIniFile(); }
 											v = g_depthOfFieldController.getPetzvalStrength();
-											changed = ImGui::DragFloat("Petzval strength", &v, 0.01f, 0.0f, 2.0f, "%.2f");
+											changed = ImGui::DragFloat("Petzval strength", &v, 0.01f, 0.0f, 5.0f, "%.2f");
 											if(changed) { g_depthOfFieldController.setPetzvalStrength(v); saveIniFile(); }
 											float center[2] = { g_depthOfFieldController.getPetzvalCenterX(), g_depthOfFieldController.getPetzvalCenterY() };
 											changed = ImGui::DragFloat2("Petzval optical center X / Y", center, 0.001f, 0.0f, 1.0f, "%.3f");

@@ -185,9 +185,9 @@ public:
 		void setDistortionStartRadius(float newValue) { _distortionStartRadius = IGCS::Utils::clampEx(newValue, 0.0f, 0.999f); }
 		void setDistortionEndRadius(float newValue) { _distortionEndRadius = IGCS::Utils::clampEx(newValue, 0.001f, 1.0f); }
 		void setPetzvalEnabled(bool newValue) { _petzvalEnabled = newValue; }
-		void setPetzvalTangential(float newValue) { _petzvalTangential = IGCS::Utils::clampEx(newValue, -3.0f, 3.0f); }
-		void setPetzvalSagittal(float newValue) { _petzvalSagittal = IGCS::Utils::clampEx(newValue, -3.0f, 3.0f); }
-		void setPetzvalStrength(float newValue) { _petzvalStrength = IGCS::Utils::clampEx(newValue, 0.0f, 2.0f); }
+		void setPetzvalTangential(float newValue) { _petzvalTangential = IGCS::Utils::clampEx(newValue, -6.0f, 6.0f); }
+		void setPetzvalSagittal(float newValue) { _petzvalSagittal = IGCS::Utils::clampEx(newValue, -6.0f, 6.0f); }
+		void setPetzvalStrength(float newValue) { _petzvalStrength = IGCS::Utils::clampEx(newValue, 0.0f, 5.0f); }
 		void setPetzvalCenterX(float newValue) { _petzvalCenterX = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
 		void setPetzvalCenterY(float newValue) { _petzvalCenterY = IGCS::Utils::clampEx(newValue, 0.0f, 1.0f); }
 		void setPetzvalShowGuide(bool newValue) { _petzvalShowGuide = newValue; }

@@ -245,9 +245,9 @@ void DepthOfFieldController::loadIniFileData(CDataFile& iniFile)
 		_distortionStartRadius = IGCS::Utils::clampEx(_distortionStartRadius, 0.0f, 0.999f);
 		_distortionEndRadius = IGCS::Utils::clampEx(_distortionEndRadius, 0.001f, 1.0f);
 		if(_distortionEndRadius <= _distortionStartRadius) _distortionEndRadius = std::min(1.0f, _distortionStartRadius + 0.001f);
-		_petzvalTangential = IGCS::Utils::clampEx(_petzvalTangential, -3.0f, 3.0f);
-		_petzvalSagittal = IGCS::Utils::clampEx(_petzvalSagittal, -3.0f, 3.0f);
-		_petzvalStrength = IGCS::Utils::clampEx(_petzvalStrength, 0.0f, 2.0f);
+		_petzvalTangential = IGCS::Utils::clampEx(_petzvalTangential, -6.0f, 6.0f);
+		_petzvalSagittal = IGCS::Utils::clampEx(_petzvalSagittal, -6.0f, 6.0f);
+		_petzvalStrength = IGCS::Utils::clampEx(_petzvalStrength, 0.0f, 5.0f);
 		_petzvalCenterX = IGCS::Utils::clampEx(_petzvalCenterX, 0.0f, 1.0f);
 		_petzvalCenterY = IGCS::Utils::clampEx(_petzvalCenterY, 0.0f, 1.0f);
 	_vignettingStart = IGCS::Utils::clampEx(_vignettingStart, 0.0f, 0.999f);
