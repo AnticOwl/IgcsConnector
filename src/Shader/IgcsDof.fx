@@ -453,8 +453,10 @@ namespace IgcsDOF
 
 		// A Petzval-like local pupil ellipse. The camera alignment itself is untouched:
 		// only the contribution of this aperture sample changes.
-		const float radialScale = max(0.10, 1.0 + edgeAmount * PetzvalSagittal * PetzvalStrength);
-		const float tangentScale = max(0.10, 1.0 + edgeAmount * PetzvalTangential * PetzvalStrength);
+		// Amplify the existing Petzval model without changing its controls or UI.
+		const float petzvalGain = PetzvalStrength * 3.0;
+		const float radialScale = max(0.10, 1.0 + edgeAmount * PetzvalSagittal * petzvalGain);
+		const float tangentScale = max(0.10, 1.0 + edgeAmount * PetzvalTangential * petzvalGain);
 
 		const float shapedRadius = length(float2(
 			radialComponent / radialScale,
@@ -465,7 +467,7 @@ namespace IgcsDOF
 		const float pupil = smoothstep(1.08, 0.90, shapedRadius);
 		const float anisotropy = saturate(edgeAmount *
 			max(abs(PetzvalTangential), abs(PetzvalSagittal)) *
-			PetzvalStrength);
+			petzvalGain);
 		return lerp(1.0, max(0.02, pupil), anisotropy);
 	}
 
