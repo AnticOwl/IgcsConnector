@@ -545,6 +545,7 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismEnabled(astigmatismEnabled);
+								g_depthOfFieldController.writeVariableStateToShader(runtime);
 								saveIniFile();
 							}
 							float astigmatismStrength = g_depthOfFieldController.getAstigmatismStrength();
@@ -553,6 +554,7 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismStrength(astigmatismStrength);
+								g_depthOfFieldController.writeVariableStateToShader(runtime);
 								saveIniFile();
 							}
 							float astigmatismRotation = g_depthOfFieldController.getAstigmatismRotation();
@@ -561,6 +563,7 @@ static void displaySettings(reshade::api::effect_runtime* runtime)
 							if(changed)
 							{
 								g_depthOfFieldController.setAstigmatismRotation(astigmatismRotation);
+								g_depthOfFieldController.writeVariableStateToShader(runtime);
 								saveIniFile();
 							}
 

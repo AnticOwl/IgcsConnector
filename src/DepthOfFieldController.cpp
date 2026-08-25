@@ -73,6 +73,9 @@ void DepthOfFieldController::setXFocusDelta(reshade::api::effect_runtime* runtim
 	_focusDelta = newValueX;
 	calculateShapePoints();
 	setUniformFloatVariable(runtime, "FocusDelta", _focusDelta);
+	setUniformBoolVariable(runtime, "AstigmatismEnabled", _astigmatismEnabled);
+	setUniformFloatVariable(runtime, "AstigmatismStrength", _astigmatismStrength);
+	setUniformFloatVariable(runtime, "AstigmatismRotation", _astigmatismRotation);
 }
 
 

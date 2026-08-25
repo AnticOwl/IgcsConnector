@@ -55,6 +55,10 @@ namespace IgcsDOF
 		ui_step = 0.001;
 	> = 0.5;
 
+	uniform bool AstigmatismEnabled < hidden=true; > = false;
+	uniform float AstigmatismStrength < hidden=true; > = 0.0;
+	uniform float AstigmatismRotation < hidden=true; > = 0.0;
+
 	uniform bool TiltedFocusPlaneEnabled < hidden=true; > = false;
 
 	uniform int TiltedFocusPlaneMode < hidden=true; > = 0;
@@ -563,6 +567,28 @@ namespace IgcsDOF
 	}
 
 
+	float2 applyAstigmatismSetupPreview(float2 alignment)
+	{
+		if(!AstigmatismEnabled || AstigmatismStrength <= 0.0001)
+		{
+			return alignment;
+		}
+
+		const float angle = radians(AstigmatismRotation);
+		const float c = cos(angle);
+		const float s = sin(angle);
+		const float localX = alignment.x * c + alignment.y * s;
+		const float localY = -alignment.x * s + alignment.y * c;
+
+		const float axisSplit = 0.5 * AstigmatismStrength;
+		const float focusedLocalX = localX * (1.0 + axisSplit);
+		const float focusedLocalY = localY * (1.0 - axisSplit);
+
+		return float2(
+			focusedLocalX * c - focusedLocalY * s,
+			focusedLocalX * s + focusedLocalY * c);
+	}
+
 	float2 applyTiltedFocusPlane(float2 uv, float2 alignment)
 	{
 		if(!TiltedFocusPlaneEnabled)
@@ -603,7 +629,8 @@ namespace IgcsDOF
 		else if(SessionState == 2)
 		{
 			const float2 warpedUv = applyLensDistortion(uv);
-			float2 setupAlignment = applyTiltedFocusPlane(warpedUv, float2(FocusDelta, 0.0));
+			float2 setupAlignment = applyAstigmatismSetupPreview(float2(FocusDelta, 0.0));
+			setupAlignment = applyTiltedFocusPlane(warpedUv, setupAlignment);
 			float2 shifted_uv = warpedUv - setupAlignment;
 			float3 currentFragment = tex2Dlod(ReShade::BackBuffer, float4(shifted_uv, 0, 0)).rgb;
 
