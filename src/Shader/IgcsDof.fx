@@ -40,7 +40,7 @@
 
 namespace IgcsDOF
 {
-	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-overlay-test1"
+	#define IGCS_DOF_SHADER_VERSION "v2.5.4-tilt-cross-saddle-test1"
 	
 // #define IGCS_DOF_DEBUG	
 	
@@ -55,142 +55,70 @@ namespace IgcsDOF
 		ui_step = 0.001;
 	> = 0.5;
 
-	uniform bool TiltedFocusPlaneEnabled <
-		ui_category = "Tilt (TEST)";
-		ui_label = "Enable Tilt";
-		ui_tooltip = "Tilts the focus plane around the normal focus pivot. The pivot itself remains unchanged.";
-	> = false;
+	uniform bool TiltedFocusPlaneEnabled < hidden=true; > = false;
 
-	uniform float TiltedFocusPlaneAngle <
-		ui_category = "Tilt (TEST)";
-		ui_label = "Tilt angle";
-		ui_type = "drag";
-		ui_min = -45.0; ui_max = 45.0;
-		ui_step = 0.1;
-		ui_tooltip = "Signed tilt angle in degrees. 0 keeps the original parallel focus plane.";
-	> = 0.0;
+	uniform int TiltedFocusPlaneMode < hidden=true; > = 0;
 
-	uniform float TiltedFocusPlaneRotation <
-		ui_category = "Tilt (TEST)";
-		ui_label = "Tilt rotation";
-		ui_type = "drag";
-		ui_min = 0.0; ui_max = 180.0;
-		ui_step = 0.1;
-		ui_tooltip = "Direction of the focus-depth gradient. 0 degrees = left/right, 90 degrees = top/bottom.";
-	> = 0.0;
+	uniform float TiltedFocusPlaneHorizontal < hidden=true; > = 0.0;
 
-	uniform bool TiltedFocusPlaneTwoPass <
-		ui_category = "Tilt (TEST)";
-		ui_label = "Two-pass (+Tilt / -Tilt)";
-		ui_tooltip = "Runs the complete camera sample sequence with +Tilt, then repeats the same XYZ sequence with -Tilt. Render time is approximately doubled.";
-	> = false;
+	uniform float TiltedFocusPlaneVertical < hidden=true; > = 0.0;
 
-	uniform bool TiltedFocusPlaneShowOverlay <
-		ui_category = "Tilt (TEST)";
-		ui_label = "Show tilt overlay";
-		ui_tooltip = "Shows the focus-plane direction directly over the setup image. Red is nearer, blue is deeper. The overlay is never included in screenshots.";
-	> = true;
+	uniform float TiltedFocusPlaneCrossSaddle < hidden=true; > = 0.0;
 
-	uniform bool LensDistortionEnabled <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Enable distortion";
-		ui_tooltip = "Applies radial lens distortion in the same sampling space as the DOF alignment, so focus and bokeh follow the warped image rather than being distorted only as a final post-process.";
-	> = false;
+	uniform float TiltedFocusPlaneCrossSaddleRotation < hidden=true; > = 0.0;
 
-	uniform bool LensDistortionShowGuide <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Always show center / radius guide";
-		ui_tooltip = "Keeps the distortion guide visible during DOF setup. When disabled, the guide still appears automatically while a distortion parameter is being edited.";
-	> = false;
+	uniform float TiltedFocusPlaneCornerTL < hidden=true; > = 0.0;
 
-	uniform bool LensDistortionAutoFill <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Auto fill frame";
-		ui_tooltip = "Automatically crops/zooms around the distortion center just enough to keep outward radial distortion from exposing black image borders.";
-	> = true;
+	uniform float TiltedFocusPlaneCornerTR < hidden=true; > = 0.0;
 
-	uniform float LensDistortionFillCrop <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Extra fill / crop";
-		ui_type = "drag";
-		ui_min = 1.0; ui_max = 2.0;
-		ui_step = 0.001;
-		ui_tooltip = "Additional crop after automatic frame filling. 1.0 adds no extra crop.";
-	> = 1.0;
+	uniform float TiltedFocusPlaneCornerBL < hidden=true; > = 0.0;
 
-	uniform float LensDistortionStrength <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Distortion amount (Pincushion <-> Barrel)";
-		ui_type = "drag";
-		ui_min = -0.75; ui_max = 0.75;
-		ui_step = 0.001;
-		ui_tooltip = "0 is neutral. Negative values move toward pincushion distortion; positive values move toward barrel distortion.";
-	> = 0.0;
+	uniform float TiltedFocusPlaneCornerBR < hidden=true; > = 0.0;
 
-	uniform float LensDistortionCurve <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Secondary curve";
-		ui_type = "drag";
-		ui_min = -0.75; ui_max = 0.75;
-		ui_step = 0.001;
-		ui_tooltip = "Second radial term. Use small values to shape how strongly the distortion grows toward the corners.";
-	> = 0.0;
+	uniform float TiltedFocusPlanePivotX < hidden=true; > = 0.5;
 
-	uniform float LensDistortionCenterX <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Distortion center X";
-		ui_type = "drag";
-		ui_min = 0.0; ui_max = 1.0;
-		ui_step = 0.001;
-	> = 0.5;
+	uniform float TiltedFocusPlanePivotY < hidden=true; > = 0.5;
 
-	uniform float LensDistortionCenterY <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Distortion center Y";
-		ui_type = "drag";
-		ui_min = 0.0; ui_max = 1.0;
-		ui_step = 0.001;
-	> = 0.5;
+	uniform bool TiltedFocusPlaneTwoPass < hidden=true; > = false;
 
-	uniform float LensDistortionStartRadius <
-		ui_category = "Distortion (TEST)";
-		ui_label = "Start radius";
-		ui_type = "drag";
-		ui_min = 0.0; ui_max = 1.0;
-		ui_step = 0.001;
-		ui_tooltip = "Normalized lens radius where distortion starts. Inside this radius the image stays unchanged.";
-	> = 0.0;
+	uniform bool TiltedFocusPlaneShowOverlay < hidden=true; > = true;
 
-	uniform float LensDistortionEndRadius <
-		ui_category = "Distortion (TEST)";
-		ui_label = "End radius";
-		ui_type = "drag";
-		ui_min = 0.001; ui_max = 1.0;
-		ui_step = 0.001;
-		ui_tooltip = "Normalized lens radius where the requested distortion reaches full strength.";
-	> = 1.0;
 
-	uniform bool VignettingShowGuide <
-		ui_category = "Vignetting (TEST)";
-		ui_label = "Show center / radius guide";
-		ui_tooltip = "Shows a crosshair at the vignetting center plus the start and end radii during DOF setup.";
-	> = true;
 
-	uniform float VignettingCenterX <
-		ui_category = "Vignetting (TEST)";
-		ui_label = "Vignetting center X";
-		ui_type = "drag";
-		ui_min = 0.0; ui_max = 1.0;
-		ui_step = 0.001;
-	> = 0.5;
 
-	uniform float VignettingCenterY <
-		ui_category = "Vignetting (TEST)";
-		ui_label = "Vignetting center Y";
-		ui_type = "drag";
-		ui_min = 0.0; ui_max = 1.0;
-		ui_step = 0.001;
-	> = 0.5;
+	uniform bool PetzvalBokehEnabled < hidden=true; > = false;
+	uniform float PetzvalTangential < hidden=true; > = 0.0;
+	uniform float PetzvalSagittal < hidden=true; > = 0.0;
+	uniform float PetzvalStrength < hidden=true; > = 1.0;
+	uniform float PetzvalCenterX < hidden=true; > = 0.5;
+	uniform float PetzvalCenterY < hidden=true; > = 0.5;
+	uniform bool PetzvalShowGuide < hidden=true; > = false;
+
+	uniform bool LensDistortionEnabled < hidden=true; > = false;
+
+	uniform bool LensDistortionShowGuide < hidden=true; > = false;
+
+	uniform bool LensDistortionAutoFill < hidden=true; > = true;
+
+	uniform float LensDistortionFillCrop < hidden=true; > = 1.0;
+
+	uniform float LensDistortionStrength < hidden=true; > = 0.0;
+
+	uniform float LensDistortionCurve < hidden=true; > = 0.0;
+
+	uniform float LensDistortionCenterX < hidden=true; > = 0.5;
+
+	uniform float LensDistortionCenterY < hidden=true; > = 0.5;
+
+	uniform float LensDistortionStartRadius < hidden=true; > = 0.0;
+
+	uniform float LensDistortionEndRadius < hidden=true; > = 1.0;
+
+	uniform bool VignettingShowGuide < hidden=true; > = false;
+
+	uniform float VignettingCenterX < hidden=true; > = 0.5;
+
+	uniform float VignettingCenterY < hidden=true; > = 0.5;
 
 	// ReShade overlay state. The same mechanism is used by Marty's focus helper:
 	// the guide can appear only while its UI controls are actively edited.
@@ -473,9 +401,6 @@ namespace IgcsDOF
 		const float2 c3 = (float2(1.0, 1.0) - center) * aspectScale;
 		const float maxR2 = max(max(dot(c0, c0), dot(c1, c1)), max(dot(c2, c2), dot(c3, c3)));
 
-		// Find the largest outward scale of 1 + S*r^2 + C*r^4 on the radius range.
-		// The Start/End radius ramp is in [0,1], so ignoring it here is conservative:
-		// it can only reduce a positive outward displacement, never increase it.
 		float maxOutwardTerm = max(0.0, LensDistortionStrength * maxR2 + LensDistortionCurve * maxR2 * maxR2);
 		if(LensDistortionCurve < -1e-6)
 		{
@@ -484,6 +409,64 @@ namespace IgcsDOF
 		}
 
 		return zoom * max(1.0, 1.0 + maxOutwardTerm);
+	}
+
+
+	float petzvalBokehWeight(float2 uv, float2 apertureSample)
+	{
+		if(!PetzvalBokehEnabled || PetzvalStrength <= 0.0001 ||
+		   (abs(PetzvalTangential) < 0.0001 && abs(PetzvalSagittal) < 0.0001))
+		{
+			return 1.0;
+		}
+
+		const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+		float2 p = uv - float2(PetzvalCenterX, PetzvalCenterY);
+		p.x *= screenAspect;
+
+		const float radius = length(p);
+		if(radius < 1e-6)
+		{
+			return 1.0;
+		}
+
+		const float maxRadius = max(
+			length(float2(PetzvalCenterX * screenAspect, PetzvalCenterY)),
+			max(
+				length(float2((1.0 - PetzvalCenterX) * screenAspect, PetzvalCenterY)),
+				max(
+					length(float2(PetzvalCenterX * screenAspect, 1.0 - PetzvalCenterY)),
+					length(float2((1.0 - PetzvalCenterX) * screenAspect, 1.0 - PetzvalCenterY))
+				)
+			)
+		);
+		const float edgeAmount = saturate(radius / max(maxRadius, 1e-6));
+
+		float2 radial = p / radius;
+		float2 tangent = float2(-radial.y, radial.x);
+
+		float2 a = apertureSample;
+		a.x *= screenAspect;
+
+		const float radialComponent = dot(a, radial);
+		const float tangentComponent = dot(a, tangent);
+
+		// A Petzval-like local pupil ellipse. The camera alignment itself is untouched:
+		// only the contribution of this aperture sample changes.
+		const float radialScale = max(0.10, 1.0 + edgeAmount * PetzvalSagittal * PetzvalStrength);
+		const float tangentScale = max(0.10, 1.0 + edgeAmount * PetzvalTangential * PetzvalStrength);
+
+		const float shapedRadius = length(float2(
+			radialComponent / radialScale,
+			tangentComponent / tangentScale));
+
+		// Smooth aperture clipping/weighting. Keep a tiny floor so the local accumulator
+		// never becomes empty, and normalize later through result.a as usual.
+		const float pupil = smoothstep(1.08, 0.90, shapedRadius);
+		const float anisotropy = saturate(edgeAmount *
+			max(abs(PetzvalTangential), abs(PetzvalSagittal)) *
+			PetzvalStrength);
+		return lerp(1.0, max(0.02, pupil), anisotropy);
 	}
 
 	float2 applyLensDistortion(float2 uv)
@@ -497,9 +480,6 @@ namespace IgcsDOF
 		const float2 center = float2(LensDistortionCenterX, LensDistortionCenterY);
 		float2 p = uv - center;
 		p.x *= screenAspect;
-
-		// Crop toward the selected optical center before the radial warp. Auto Fill
-		// chooses a conservative zoom that keeps outward barrel distortion in-frame.
 		p /= distortionFillZoom();
 
 		const float r2 = dot(p, p);
@@ -513,29 +493,84 @@ namespace IgcsDOF
 		return center + p;
 	}
 
-	float2 applyTiltedFocusPlaneWithAngle(float2 uv, float2 alignment, float tiltAngle)
+	float2 getTiltPlanePosition(float2 uv)
 	{
-		if(!TiltedFocusPlaneEnabled || abs(tiltAngle) < 0.0001)
+		const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+		float2 p = (uv - float2(TiltedFocusPlanePivotX, TiltedFocusPlanePivotY)) * 2.0;
+		p.y /= screenAspect;
+		p /= length(float2(rcp(screenAspect), 1.0));
+		return p;
+	}
+
+	float getTiltField(float2 uv)
+	{
+		float2 p = getTiltPlanePosition(uv);
+
+		// Plane: free horizontal + vertical linear gradient.
+		if(TiltedFocusPlaneMode == 0)
+		{
+			const float tx = tan(radians(TiltedFocusPlaneHorizontal));
+			const float ty = tan(radians(TiltedFocusPlaneVertical));
+			return p.x * tx - p.y * ty;
+		}
+
+		// Cross / Saddle: x*y field evaluated in a rotatable local frame.
+		if(TiltedFocusPlaneMode == 1)
+		{
+			const float rotationRadians = radians(TiltedFocusPlaneCrossSaddleRotation);
+			const float c = cos(rotationRadians);
+			const float s = sin(rotationRadians);
+			const float2 q = float2(
+				p.x * c - p.y * s,
+				p.x * s + p.y * c);
+
+			const float saddleSlope = tan(radians(TiltedFocusPlaneCrossSaddle));
+			return (q.x * q.y) * saddleSlope * 2.0;
+		}
+
+		// Corner Control:
+		// Each corner is independent, while the selected pivot remains exactly neutral.
+		// Coordinates are normalized independently on each side of the pivot so the
+		// four image corners remain -1/+1 even when the pivot is moved.
+		const float2 pivot = float2(TiltedFocusPlanePivotX, TiltedFocusPlanePivotY);
+		float2 q;
+		q.x = uv.x >= pivot.x
+			? (uv.x - pivot.x) / max(1.0 - pivot.x, 1e-5)
+			: (uv.x - pivot.x) / max(pivot.x, 1e-5);
+		q.y = uv.y >= pivot.y
+			? (uv.y - pivot.y) / max(1.0 - pivot.y, 1e-5)
+			: (uv.y - pivot.y) / max(pivot.y, 1e-5);
+		q = clamp(q, -1.0, 1.0);
+
+		const float u = q.x * 0.5 + 0.5;
+		const float v = q.y * 0.5 + 0.5;
+
+		const float kTL = tan(radians(TiltedFocusPlaneCornerTL));
+		const float kTR = tan(radians(TiltedFocusPlaneCornerTR));
+		const float kBL = tan(radians(TiltedFocusPlaneCornerBL));
+		const float kBR = tan(radians(TiltedFocusPlaneCornerBR));
+
+		const float top = lerp(kTL, kTR, u);
+		const float bottom = lerp(kBL, kBR, u);
+		const float cornerField = lerp(top, bottom, v);
+
+		// Fade the corner field to zero at the pivot without changing the requested
+		// values at the outer image edges/corners.
+		const float pivotFade = max(abs(q.x), abs(q.y));
+		return cornerField * pivotFade;
+	}
+
+
+	float2 applyTiltedFocusPlane(float2 uv, float2 alignment)
+	{
+		if(!TiltedFocusPlaneEnabled)
 		{
 			return alignment;
 		}
 
-		float2 planePosition = uv * 2.0 - 1.0;
-		const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
-		planePosition.y /= screenAspect;
-		planePosition /= length(float2(rcp(screenAspect), 1.0));
-
-		const float rotationRadians = radians(TiltedFocusPlaneRotation);
-		const float2 depthGradientAxis = float2(cos(rotationRadians), sin(rotationRadians));
-		const float signedPosition = dot(planePosition, depthGradientAxis);
-		const float tiltSlope = tan(radians(tiltAngle));
-		const float denominator = max(0.15, 1.0 + (signedPosition * tiltSlope));
+		const float field = getTiltField(uv) * TiltPassSign;
+		const float denominator = max(0.15, 1.0 + field);
 		return alignment / denominator;
-	}
-
-	float2 applyTiltedFocusPlane(float2 uv, float2 alignment)
-	{
-		return applyTiltedFocusPlaneWithAngle(uv, alignment, TiltedFocusPlaneAngle * TiltPassSign);
 	}
 
 	struct CSIN 
@@ -545,7 +580,6 @@ namespace IgcsDOF
 		uint3 dispatchthreadid  : SV_DispatchThreadID;     
 		uint threadid           : SV_GroupIndex;
 	};
-
 
 	void IGCSCS(in CSIN i)
 	{
@@ -595,6 +629,9 @@ namespace IgcsDOF
 
 			float focusDeltaSafe = abs(FocusDelta) > 1e-6 ? FocusDelta : (FocusDelta < 0.0 ? -1e-6 : 1e-6);
 			float2 apertureSample = alignmentToUse / focusDeltaSafe * 2.0;
+			const float petzvalWeight = petzvalBokehWeight(warpedUv, apertureSample);
+			result.rgb *= petzvalWeight;
+			result.a *= petzvalWeight;
 			float2 normalizedOffset = apertureSample;
 			float2 cateyeOffset = warpedUv * 2 - 1;
 			cateyeOffset.y /= BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
@@ -614,8 +651,7 @@ namespace IgcsDOF
 			result.rgb *= cateyeMask;
 			result.a *= CateyeVignette ? 1 : cateyeMask;
 
-			// Preserve the validated c250edde render-time pupil vignetting model.
-			// Only the optical center is made movable here.
+			// Preserve validated render-time vignetting math.
 			if(VignettingEnabled)
 			{
 				float2 lensOffset = (warpedUv - float2(VignettingCenterX, VignettingCenterY)) * 2.0;
@@ -628,9 +664,6 @@ namespace IgcsDOF
 				float pupilShift = vignetteFalloff * VignettingStrength * sqrt(2.0);
 				float2 vignetteSample = apertureSample + radialDirection * pupilShift;
 				float vignetteMask = smoothstep(1.0, 0.98, length(vignetteSample));
-
-				// Keep alpha untouched: rejected lens samples contribute less light instead of
-				// being renormalized away. This makes the vignetting part of the DOF exposure.
 				result.rgb *= vignetteMask;
 			}
 			
@@ -651,7 +684,6 @@ namespace IgcsDOF
 			tex2Dstore(StorageDisplay, i.dispatchthreadid.xy, float4(result.rgb, 1));			
 		}
 	}
-
 
 	void VS_Output(in uint id : SV_VertexID, out float4 vpos : SV_Position, out float2 texcoord : TEXCOORD)
 	{
@@ -677,68 +709,172 @@ namespace IgcsDOF
 			}
 		}
 
-		// Lightweight in-game Tilt visualization. It intentionally does not alter the
-		// validated tilt math: it only visualizes the current angle/rotation over the setup image.
-		// Red = nearer, blue = deeper, neutral = current focus pivot.
-		const bool tiltGuideEditing = OVERLAY_OPEN && ACTIVE_VARIABLE >= 2 && ACTIVE_VARIABLE <= 6;
-		if(SessionState==2 && TiltedFocusPlaneEnabled && !SCREENSHOT && (TiltedFocusPlaneShowOverlay || tiltGuideEditing))
+		if(SessionState==2 && TiltedFocusPlaneEnabled && !SCREENSHOT && TiltedFocusPlaneShowOverlay)
 		{
 			const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
-			const float2 pivot = float2(0.5, 0.5);
-			const float rotationRadians = radians(TiltedFocusPlaneRotation);
-			float2 deepAxis = float2(cos(rotationRadians), sin(rotationRadians));
-			deepAxis *= TiltedFocusPlaneAngle < 0.0 ? -1.0 : 1.0;
-
-			float2 planePos = texcoord - pivot;
-			planePos.x *= screenAspect;
-			const float signedDepth = dot(planePos, deepAxis);
-			const float tiltAmount = saturate(abs(TiltedFocusPlaneAngle) / 45.0);
-			const float tintAmount = 0.11 * tiltAmount * smoothstep(0.02, 0.65, abs(signedDepth));
-			const float3 depthColor = signedDepth >= 0.0 ? float3(0.12, 0.42, 1.0) : float3(1.0, 0.16, 0.10);
-			fragment = lerp(fragment, depthColor, tintAmount);
-
-			// Handle points toward the deeper side. Distance from the pivot represents tilt strength.
-			const float handleDistance = lerp(0.055, 0.33, tiltAmount);
-			const float2 handle = pivot + float2(deepAxis.x / screenAspect, deepAxis.y) * handleDistance;
+			const float2 pivot = float2(TiltedFocusPlanePivotX, TiltedFocusPlanePivotY);
+			const float3 nearColor = float3(1.0, 0.16, 0.10);
+			const float3 deepColor = float3(0.12, 0.42, 1.0);
+			const float3 neutralColor = float3(0.92, 0.92, 0.92);
 			const float pxAspect = BUFFER_PIXEL_SIZE.y;
+
+			float field = getTiltField(texcoord);
+			float amount = 0.0;
+			if(TiltedFocusPlaneMode == 0)
+			{
+				amount = saturate(length(float2(TiltedFocusPlaneHorizontal, TiltedFocusPlaneVertical)) / 45.0);
+			}
+			else if(TiltedFocusPlaneMode == 1)
+			{
+				amount = saturate(abs(TiltedFocusPlaneCrossSaddle) / 45.0);
+			}
+			else
+			{
+				const float cornerMax = max(
+					max(abs(TiltedFocusPlaneCornerTL), abs(TiltedFocusPlaneCornerTR)),
+					max(abs(TiltedFocusPlaneCornerBL), abs(TiltedFocusPlaneCornerBR)));
+				amount = saturate(cornerMax / 45.0);
+			}
+			float tint = 0.13 * amount * smoothstep(0.01, 0.65, abs(field));
+			fragment = lerp(fragment, field >= 0.0 ? deepColor : nearColor, tint);
+
 			float2 pAspect = (texcoord - pivot) * float2(screenAspect, 1.0);
-			float2 hAspect = (handle - pivot) * float2(screenAspect, 1.0);
-			const float hLen2 = max(dot(hAspect, hAspect), 1e-8);
-			const float lineT = saturate(dot(pAspect, hAspect) / hLen2);
-			const float lineDistance = length(pAspect - hAspect * lineT);
-			const bool onGuideLine = tiltAmount > 0.001 && lineT > 0.03 && lineT < 0.96 && lineDistance <= 1.25 * pxAspect;
-
-			const float2 handleDelta = (texcoord - handle) * float2(screenAspect, 1.0);
-			const float handleRadius = 9.0 * pxAspect;
-			const float handleRing = abs(length(handleDelta) - handleRadius);
-			const bool onHandle = tiltAmount > 0.001 && handleRing <= 1.8 * pxAspect;
-
 			const float pivotHalfX = 13.0 * BUFFER_PIXEL_SIZE.x;
 			const float pivotHalfY = 13.0 * BUFFER_PIXEL_SIZE.y;
 			const bool pivotV = abs(texcoord.x - pivot.x) <= 1.35 * BUFFER_PIXEL_SIZE.x && abs(texcoord.y - pivot.y) <= pivotHalfY;
 			const bool pivotH = abs(texcoord.y - pivot.y) <= 1.35 * BUFFER_PIXEL_SIZE.y && abs(texcoord.x - pivot.x) <= pivotHalfX;
-			const float pivotRingDistance = length((texcoord - pivot) * float2(screenAspect, 1.0));
+			const float pivotRingDistance = length(pAspect);
 			const bool pivotRing = abs(pivotRingDistance - 10.0 * pxAspect) <= 1.15 * pxAspect;
 
-			if(onGuideLine)
+			if(TiltedFocusPlaneMode == 0)
 			{
-				fragment = lerp(fragment, float3(0.72, 0.82, 1.0), 0.70);
+				float2 gradient = float2(tan(radians(TiltedFocusPlaneHorizontal)), -tan(radians(TiltedFocusPlaneVertical)));
+				if(length(gradient) > 1e-5)
+				{
+					float2 deepAxis = normalize(gradient);
+					float strength = saturate(length(float2(TiltedFocusPlaneHorizontal, TiltedFocusPlaneVertical)) / 45.0);
+					float handleDistance = lerp(0.055, 0.33, strength);
+					float2 handle = pivot + float2(deepAxis.x / screenAspect, deepAxis.y) * handleDistance;
+					float2 hAspect = (handle - pivot) * float2(screenAspect, 1.0);
+					float hLen2 = max(dot(hAspect, hAspect), 1e-8);
+					float lineT = saturate(dot(pAspect, hAspect) / hLen2);
+					float lineDistance = length(pAspect - hAspect * lineT);
+					bool onGuideLine = lineT > 0.03 && lineT < 0.96 && lineDistance <= 1.25 * pxAspect;
+					float2 handleDelta = (texcoord - handle) * float2(screenAspect, 1.0);
+					float handleRadius = 9.0 * pxAspect;
+					bool onHandle = abs(length(handleDelta) - handleRadius) <= 1.8 * pxAspect;
+					if(onGuideLine) fragment = lerp(fragment, float3(0.72, 0.82, 1.0), 0.70);
+					if(onHandle) fragment = lerp(fragment, deepColor, 0.96);
+				}
 			}
-			if(onHandle)
+			else if(TiltedFocusPlaneMode == 1)
 			{
-				fragment = lerp(fragment, float3(0.18, 0.58, 1.0), 0.96);
+				// Cross / Saddle: rotate the local axes first so the overlay follows
+				// the exact same orientation as the optical field.
+				float2 q = getTiltPlanePosition(texcoord);
+				const float rotationRadians = radians(TiltedFocusPlaneCrossSaddleRotation);
+				const float c = cos(rotationRadians);
+				const float s = sin(rotationRadians);
+				q = float2(
+					q.x * c - q.y * s,
+					q.x * s + q.y * c);
+
+				float diagA = abs(q.x - q.y);
+				float diagB = abs(q.x + q.y);
+				bool onDiag = min(diagA, diagB) <= 2.0 * pxAspect;
+				if(onDiag)
+				{
+					fragment = lerp(fragment, neutralColor, 0.62);
+				}
 			}
+			else
+			{
+				// Corner Control: show four small signed corner markers.
+				const float markerRadius = 9.0 * pxAspect;
+				const float2 cTL = float2(0.03, 0.03);
+				const float2 cTR = float2(0.97, 0.03);
+				const float2 cBL = float2(0.03, 0.97);
+				const float2 cBR = float2(0.97, 0.97);
+
+				float2 dTL = (texcoord - cTL) * float2(screenAspect, 1.0);
+				float2 dTR = (texcoord - cTR) * float2(screenAspect, 1.0);
+				float2 dBL = (texcoord - cBL) * float2(screenAspect, 1.0);
+				float2 dBR = (texcoord - cBR) * float2(screenAspect, 1.0);
+
+				bool mTL = abs(length(dTL) - markerRadius) <= 1.8 * pxAspect;
+				bool mTR = abs(length(dTR) - markerRadius) <= 1.8 * pxAspect;
+				bool mBL = abs(length(dBL) - markerRadius) <= 1.8 * pxAspect;
+				bool mBR = abs(length(dBR) - markerRadius) <= 1.8 * pxAspect;
+
+				if(mTL) fragment = lerp(fragment, TiltedFocusPlaneCornerTL >= 0.0 ? deepColor : nearColor, 0.96);
+				if(mTR) fragment = lerp(fragment, TiltedFocusPlaneCornerTR >= 0.0 ? deepColor : nearColor, 0.96);
+				if(mBL) fragment = lerp(fragment, TiltedFocusPlaneCornerBL >= 0.0 ? deepColor : nearColor, 0.96);
+				if(mBR) fragment = lerp(fragment, TiltedFocusPlaneCornerBR >= 0.0 ? deepColor : nearColor, 0.96);
+			}
+
 			if(pivotV || pivotH || pivotRing)
 			{
-				fragment = lerp(fragment, float3(0.92, 0.92, 0.92), 0.92);
+				fragment = lerp(fragment, neutralColor, 0.92);
 			}
 		}
 
-		// Visible uniforms are 1-based in ReShade's overlay_active source.
-		// Distortion occupies slots 7..16 in this shader. This mirrors Marty's
-		// edit-time focus helper behavior without changing the optical effect math.
-		const bool distortionGuideEditing = OVERLAY_OPEN && ACTIVE_VARIABLE >= 7 && ACTIVE_VARIABLE <= 16;
-		if(SessionState==2 && LensDistortionEnabled && !SCREENSHOT && (LensDistortionShowGuide || distortionGuideEditing))
+
+		if(SessionState==2 && PetzvalBokehEnabled && !SCREENSHOT && PetzvalShowGuide)
+		{
+			const float2 center = float2(PetzvalCenterX, PetzvalCenterY);
+			const float screenAspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
+			const float px = BUFFER_PIXEL_SIZE.x;
+			const float py = BUFFER_PIXEL_SIZE.y;
+			const bool crossV = abs(texcoord.x - center.x) <= 1.5 * px && abs(texcoord.y - center.y) <= 22.0 * py;
+			const bool crossH = abs(texcoord.y - center.y) <= 1.5 * py && abs(texcoord.x - center.x) <= 22.0 * px;
+
+			float2 p = (texcoord - center) * float2(screenAspect, 1.0);
+			const float radius = length(p);
+			const float maxRadius = max(
+				length(float2(PetzvalCenterX * screenAspect, PetzvalCenterY)),
+				max(
+					length(float2((1.0 - PetzvalCenterX) * screenAspect, PetzvalCenterY)),
+					max(
+						length(float2(PetzvalCenterX * screenAspect, 1.0 - PetzvalCenterY)),
+						length(float2((1.0 - PetzvalCenterX) * screenAspect, 1.0 - PetzvalCenterY))
+					)
+				)
+			);
+			const float radius01 = radius / max(maxRadius, 1e-6);
+			const bool innerRing = abs(radius01 - 0.35) <= 0.0035;
+			const bool outerRing = abs(radius01 - 0.75) <= 0.0035;
+
+			if(outerRing) fragment = lerp(fragment, float3(1.0, 0.35, 0.20), 0.85);
+			if(innerRing) fragment = lerp(fragment, float3(0.95, 0.85, 0.20), 0.90);
+			if(crossV || crossH) fragment = lerp(fragment, float3(0.20, 1.0, 0.60), 0.95);
+
+			if(radius > 1e-6)
+			{
+				float2 radial = p / radius;
+				float2 tangent = float2(-radial.y, radial.x);
+				const float2 centerAspect = float2(center.x * screenAspect, center.y);
+				const float2 posAspect = float2(texcoord.x * screenAspect, texcoord.y);
+
+				float2 a = centerAspect - radial * 0.10;
+				float2 b = centerAspect + radial * 0.10;
+				float2 pa = posAspect - a;
+				float2 ba = b - a;
+				float t = saturate(dot(pa, ba) / max(dot(ba, ba), 1e-6));
+				float radialLine = 1.0 - smoothstep(0.002, 0.004, length(pa - ba * t));
+
+				a = centerAspect - tangent * 0.08;
+				b = centerAspect + tangent * 0.08;
+				pa = posAspect - a;
+				ba = b - a;
+				t = saturate(dot(pa, ba) / max(dot(ba, ba), 1e-6));
+				float tangentLine = 1.0 - smoothstep(0.002, 0.004, length(pa - ba * t));
+
+				if(radialLine > 0.01) fragment = lerp(fragment, float3(0.20, 0.75, 1.00), radialLine * 0.85);
+				if(tangentLine > 0.01) fragment = lerp(fragment, float3(1.00, 0.60, 0.20), tangentLine * 0.85);
+			}
+		}
+
+		if(SessionState==2 && LensDistortionEnabled && !SCREENSHOT && LensDistortionShowGuide)
 		{
 			const float2 center = float2(LensDistortionCenterX, LensDistortionCenterY);
 			const float radius01 = distortionRadius01(texcoord);
@@ -752,18 +888,9 @@ namespace IgcsDOF
 			const bool onStartRing = abs(radius01 - LensDistortionStartRadius) <= ringThickness;
 			const bool onEndRing = abs(radius01 - max(LensDistortionEndRadius, LensDistortionStartRadius + 0.001)) <= ringThickness;
 
-			if(onEndRing)
-			{
-				fragment = lerp(fragment, float3(1.0, 0.25, 0.15), 0.85);
-			}
-			if(onStartRing)
-			{
-				fragment = lerp(fragment, float3(1.0, 0.85, 0.15), 0.90);
-			}
-			if(crossV || crossH)
-			{
-				fragment = lerp(fragment, float3(0.15, 0.95, 1.0), 0.95);
-			}
+			if(onEndRing) fragment = lerp(fragment, float3(1.0, 0.25, 0.15), 0.85);
+			if(onStartRing) fragment = lerp(fragment, float3(1.0, 0.85, 0.15), 0.90);
+			if(crossV || crossH) fragment = lerp(fragment, float3(0.15, 0.95, 1.0), 0.95);
 		}
 
 		if(SessionState==2 && VignettingShowGuide)
@@ -780,18 +907,9 @@ namespace IgcsDOF
 			const bool onStartRing = abs(radius01 - VignettingStart) <= ringThickness;
 			const bool onEndRing = abs(radius01 - VignettingEnd) <= ringThickness;
 
-			if(onEndRing)
-			{
-				fragment = lerp(fragment, float3(0.95, 0.20, 0.85), 0.85);
-			}
-			if(onStartRing)
-			{
-				fragment = lerp(fragment, float3(0.85, 0.75, 0.20), 0.90);
-			}
-			if(crossV || crossH)
-			{
-				fragment = lerp(fragment, float3(0.25, 1.0, 0.45), 0.95);
-			}
+			if(onEndRing) fragment = lerp(fragment, float3(0.95, 0.20, 0.85), 0.85);
+			if(onStartRing) fragment = lerp(fragment, float3(0.85, 0.75, 0.20), 0.90);
+			if(crossV || crossH) fragment = lerp(fragment, float3(0.25, 1.0, 0.45), 0.95);
 		}
 	}
 

@@ -110,8 +110,41 @@ void DepthOfFieldController::writeVariableStateToShader(reshade::api::effect_run
 	setUniformFloatVariable(runtime, "FocusDelta", _focusDelta);
 	setUniformBoolVariable(runtime, "BlendFrame", _blendFrame);
 	setUniformFloatVariable(runtime, "BlendFactor", _blendFactor);
-	setUniformFloat2Variable(runtime, "AlignmentDelta", _xAlignmentDelta, _yAlignmentDelta);
-	setUniformFloatVariable(runtime, "TiltPassSign", _tiltPassSign);
+		setUniformFloat2Variable(runtime, "AlignmentDelta", _xAlignmentDelta, _yAlignmentDelta);
+		setUniformFloatVariable(runtime, "TiltPassSign", _tiltPassSign);
+		setUniformBoolVariable(runtime, "TiltedFocusPlaneEnabled", _tiltEnabled);
+		setUniformIntVariable(runtime, "TiltedFocusPlaneMode", _tiltMode);
+		setUniformFloatVariable(runtime, "TiltedFocusPlaneHorizontal", _tiltHorizontal);
+		setUniformFloatVariable(runtime, "TiltedFocusPlaneVertical", _tiltVertical);
+		setUniformFloatVariable(runtime, "TiltedFocusPlaneCrossSaddle", _tiltCrossSaddle);
+		setUniformFloatVariable(runtime, "TiltedFocusPlaneCrossSaddleRotation", _tiltCrossSaddleRotation);
+		setUniformFloatVariable(runtime, "TiltedFocusPlaneCornerTL", _tiltCornerTL);
+		setUniformFloatVariable(runtime, "TiltedFocusPlaneCornerTR", _tiltCornerTR);
+		setUniformFloatVariable(runtime, "TiltedFocusPlaneCornerBL", _tiltCornerBL);
+		setUniformFloatVariable(runtime, "TiltedFocusPlaneCornerBR", _tiltCornerBR);
+		setUniformFloatVariable(runtime, "TiltedFocusPlanePivotX", _tiltPivotX);
+		setUniformFloatVariable(runtime, "TiltedFocusPlanePivotY", _tiltPivotY);
+		setUniformBoolVariable(runtime, "TiltedFocusPlaneTwoPass", _tiltTwoPass);
+		setUniformBoolVariable(runtime, "TiltedFocusPlaneShowOverlay", _tiltShowOverlay);
+
+		setUniformBoolVariable(runtime, "LensDistortionEnabled", _distortionEnabled);
+		setUniformBoolVariable(runtime, "LensDistortionShowGuide", _distortionShowGuide);
+		setUniformBoolVariable(runtime, "LensDistortionAutoFill", _distortionAutoFill);
+		setUniformFloatVariable(runtime, "LensDistortionFillCrop", _distortionFillCrop);
+		setUniformFloatVariable(runtime, "LensDistortionStrength", _distortionStrength);
+		setUniformFloatVariable(runtime, "LensDistortionCurve", _distortionCurve);
+		setUniformFloatVariable(runtime, "LensDistortionCenterX", _distortionCenterX);
+		setUniformFloatVariable(runtime, "LensDistortionCenterY", _distortionCenterY);
+		setUniformFloatVariable(runtime, "LensDistortionStartRadius", _distortionStartRadius);
+		setUniformFloatVariable(runtime, "LensDistortionEndRadius", _distortionEndRadius);
+
+		setUniformBoolVariable(runtime, "PetzvalBokehEnabled", _petzvalEnabled);
+		setUniformFloatVariable(runtime, "PetzvalTangential", _petzvalTangential);
+		setUniformFloatVariable(runtime, "PetzvalSagittal", _petzvalSagittal);
+		setUniformFloatVariable(runtime, "PetzvalStrength", _petzvalStrength);
+		setUniformFloatVariable(runtime, "PetzvalCenterX", _petzvalCenterX);
+		setUniformFloatVariable(runtime, "PetzvalCenterY", _petzvalCenterY);
+		setUniformBoolVariable(runtime, "PetzvalShowGuide", _petzvalShowGuide);
 	setUniformFloatVariable(runtime, "HighlightBoost", _highlightBoostFactor);
 
 	setUniformFloatVariable(runtime, "SampleWeightR", _sampleWeightRGB[0]);
@@ -129,10 +162,13 @@ void DepthOfFieldController::writeVariableStateToShader(reshade::api::effect_run
 	setUniformFloatVariable(runtime, "CateyeRadiusEnd", _catEyeRadiusEnd);
 	setUniformFloatVariable(runtime, "CateyeIntensity", _catEyeBokehIntensity);
 
-	setUniformBoolVariable(runtime, "VignettingEnabled", _vignettingEnabled);
-	setUniformFloatVariable(runtime, "VignettingStart", _vignettingStart);
-	setUniformFloatVariable(runtime, "VignettingEnd", _vignettingEnd);
-	setUniformFloatVariable(runtime, "VignettingStrength", _vignettingStrength);
+		setUniformBoolVariable(runtime, "VignettingEnabled", _vignettingEnabled);
+		setUniformFloatVariable(runtime, "VignettingStart", _vignettingStart);
+		setUniformFloatVariable(runtime, "VignettingEnd", _vignettingEnd);
+		setUniformFloatVariable(runtime, "VignettingStrength", _vignettingStrength);
+		setUniformFloatVariable(runtime, "VignettingCenterX", _vignettingCenterX);
+		setUniformFloatVariable(runtime, "VignettingCenterY", _vignettingCenterY);
+		setUniformBoolVariable(runtime, "VignettingShowGuide", _vignettingShowGuide);
 }
 
 
@@ -143,25 +179,86 @@ void DepthOfFieldController::loadIniFileData(CDataFile& iniFile)
 	loadFloatFromIni(iniFile, "HighlightGammaFactor", &_highlightGammaFactor);
 	loadFloatFromIni(iniFile, "MagnificationAreaWidth", &_magnificationSettings.WidthMagnifierArea);
 	loadFloatFromIni(iniFile, "MagnificationAreaHeight", &_magnificationSettings.HeightMagnifierArea);
-	loadBoolFromIni(iniFile, "AnamorphicEnabled", &_anamorphicEnabled, true);
-	loadFloatFromIni(iniFile, "AnamorphicFactor", &_anamorphicFactor);
+		loadFloatFromIni(iniFile, "AnamorphicFactor", &_anamorphicFactor);
 	loadBoolFromIni(iniFile, "AstigmatismEnabled", &_astigmatismEnabled, false);
 	loadFloatFromIni(iniFile, "AstigmatismStrength", &_astigmatismStrength);
-	loadFloatFromIni(iniFile, "AstigmatismRotation", &_astigmatismRotation);
+		loadFloatFromIni(iniFile, "AstigmatismRotation", &_astigmatismRotation);
+		loadBoolFromIni(iniFile, "TiltEnabled", &_tiltEnabled, false);
+		loadIntFromIni(iniFile, "TiltMode", &_tiltMode);
+		loadFloatFromIni(iniFile, "TiltHorizontal", &_tiltHorizontal);
+		loadFloatFromIni(iniFile, "TiltVertical", &_tiltVertical);
+		loadFloatFromIni(iniFile, "TiltCrossSaddle", &_tiltCrossSaddle);
+		loadFloatFromIni(iniFile, "TiltCrossSaddleRotation", &_tiltCrossSaddleRotation);
+		loadFloatFromIni(iniFile, "TiltCornerTL", &_tiltCornerTL);
+		loadFloatFromIni(iniFile, "TiltCornerTR", &_tiltCornerTR);
+		loadFloatFromIni(iniFile, "TiltCornerBL", &_tiltCornerBL);
+		loadFloatFromIni(iniFile, "TiltCornerBR", &_tiltCornerBR);
+		loadFloatFromIni(iniFile, "TiltPivotX", &_tiltPivotX);
+		loadFloatFromIni(iniFile, "TiltPivotY", &_tiltPivotY);
+		loadBoolFromIni(iniFile, "TiltShowOverlay", &_tiltShowOverlay, true);
+		loadBoolFromIni(iniFile, "TiltTwoPass", &_tiltTwoPass, false);
+
+		loadBoolFromIni(iniFile, "DistortionEnabled", &_distortionEnabled, false);
+		loadBoolFromIni(iniFile, "DistortionShowGuide", &_distortionShowGuide, false);
+		loadBoolFromIni(iniFile, "DistortionAutoFill", &_distortionAutoFill, true);
+		loadFloatFromIni(iniFile, "DistortionFillCrop", &_distortionFillCrop);
+		loadFloatFromIni(iniFile, "DistortionStrength", &_distortionStrength);
+		loadFloatFromIni(iniFile, "DistortionCurve", &_distortionCurve);
+		loadFloatFromIni(iniFile, "DistortionCenterX", &_distortionCenterX);
+		loadFloatFromIni(iniFile, "DistortionCenterY", &_distortionCenterY);
+		loadFloatFromIni(iniFile, "DistortionStartRadius", &_distortionStartRadius);
+		loadFloatFromIni(iniFile, "DistortionEndRadius", &_distortionEndRadius);
+
+		loadBoolFromIni(iniFile, "PetzvalEnabled", &_petzvalEnabled, false);
+		loadFloatFromIni(iniFile, "PetzvalTangential", &_petzvalTangential);
+		loadFloatFromIni(iniFile, "PetzvalSagittal", &_petzvalSagittal);
+		loadFloatFromIni(iniFile, "PetzvalStrength", &_petzvalStrength);
+		loadFloatFromIni(iniFile, "PetzvalCenterX", &_petzvalCenterX);
+		loadFloatFromIni(iniFile, "PetzvalCenterY", &_petzvalCenterY);
+		loadBoolFromIni(iniFile, "PetzvalShowGuide", &_petzvalShowGuide, false);
 	loadBoolFromIni(iniFile, "VignettingEnabled", &_vignettingEnabled, false);
 	loadFloatFromIni(iniFile, "VignettingStart", &_vignettingStart);
 	loadFloatFromIni(iniFile, "VignettingEnd", &_vignettingEnd);
-	loadFloatFromIni(iniFile, "VignettingStrength", &_vignettingStrength);
+		loadFloatFromIni(iniFile, "VignettingStrength", &_vignettingStrength);
+		loadFloatFromIni(iniFile, "VignettingCenterX", &_vignettingCenterX);
+		loadFloatFromIni(iniFile, "VignettingCenterY", &_vignettingCenterY);
+		loadBoolFromIni(iniFile, "VignettingShowGuide", &_vignettingShowGuide, false);
 
 	_astigmatismStrength = IGCS::Utils::clampEx(_astigmatismStrength, 0.0f, 2.0f);
-	_astigmatismRotation = IGCS::Utils::clampEx(_astigmatismRotation, 0.0f, 180.0f);
+		_astigmatismRotation = IGCS::Utils::clampEx(_astigmatismRotation, 0.0f, 180.0f);
+		_tiltMode = IGCS::Utils::clampEx(_tiltMode, 0, 2);
+		_tiltHorizontal = IGCS::Utils::clampEx(_tiltHorizontal, -45.0f, 45.0f);
+		_tiltVertical = IGCS::Utils::clampEx(_tiltVertical, -45.0f, 45.0f);
+		_tiltCrossSaddle = IGCS::Utils::clampEx(_tiltCrossSaddle, -45.0f, 45.0f);
+		_tiltCrossSaddleRotation = IGCS::Utils::clampEx(_tiltCrossSaddleRotation, 0.0f, 180.0f);
+		_tiltCornerTL = IGCS::Utils::clampEx(_tiltCornerTL, -45.0f, 45.0f);
+		_tiltCornerTR = IGCS::Utils::clampEx(_tiltCornerTR, -45.0f, 45.0f);
+		_tiltCornerBL = IGCS::Utils::clampEx(_tiltCornerBL, -45.0f, 45.0f);
+		_tiltCornerBR = IGCS::Utils::clampEx(_tiltCornerBR, -45.0f, 45.0f);
+		_tiltPivotX = IGCS::Utils::clampEx(_tiltPivotX, 0.0f, 1.0f);
+		_tiltPivotY = IGCS::Utils::clampEx(_tiltPivotY, 0.0f, 1.0f);
+		_distortionFillCrop = IGCS::Utils::clampEx(_distortionFillCrop, 1.0f, 2.0f);
+		_distortionStrength = IGCS::Utils::clampEx(_distortionStrength, -0.75f, 0.75f);
+		_distortionCurve = IGCS::Utils::clampEx(_distortionCurve, -0.75f, 0.75f);
+		_distortionCenterX = IGCS::Utils::clampEx(_distortionCenterX, 0.0f, 1.0f);
+		_distortionCenterY = IGCS::Utils::clampEx(_distortionCenterY, 0.0f, 1.0f);
+		_distortionStartRadius = IGCS::Utils::clampEx(_distortionStartRadius, 0.0f, 0.999f);
+		_distortionEndRadius = IGCS::Utils::clampEx(_distortionEndRadius, 0.001f, 1.0f);
+		if(_distortionEndRadius <= _distortionStartRadius) _distortionEndRadius = std::min(1.0f, _distortionStartRadius + 0.001f);
+		_petzvalTangential = IGCS::Utils::clampEx(_petzvalTangential, -3.0f, 3.0f);
+		_petzvalSagittal = IGCS::Utils::clampEx(_petzvalSagittal, -3.0f, 3.0f);
+		_petzvalStrength = IGCS::Utils::clampEx(_petzvalStrength, 0.0f, 2.0f);
+		_petzvalCenterX = IGCS::Utils::clampEx(_petzvalCenterX, 0.0f, 1.0f);
+		_petzvalCenterY = IGCS::Utils::clampEx(_petzvalCenterY, 0.0f, 1.0f);
 	_vignettingStart = IGCS::Utils::clampEx(_vignettingStart, 0.0f, 0.999f);
 	_vignettingEnd = IGCS::Utils::clampEx(_vignettingEnd, 0.001f, 1.0f);
 	if(_vignettingEnd <= _vignettingStart)
 	{
 		_vignettingEnd = std::min(1.0f, _vignettingStart + 0.001f);
 	}
-	_vignettingStrength = IGCS::Utils::clampEx(_vignettingStrength, 0.0f, 1.0f);
+		_vignettingStrength = IGCS::Utils::clampEx(_vignettingStrength, 0.0f, 1.0f);
+		_vignettingCenterX = IGCS::Utils::clampEx(_vignettingCenterX, 0.0f, 1.0f);
+		_vignettingCenterY = IGCS::Utils::clampEx(_vignettingCenterY, 0.0f, 1.0f);
 
 	loadFloatFromIni(iniFile, "RingAngleOffset", &_ringAngleOffset);
 	loadFloatFromIni(iniFile, "RotationAngle", &_apertureShapeSettings.RotationAngle);
@@ -197,15 +294,50 @@ void DepthOfFieldController::saveIniFileData(CDataFile& iniFile)
 	iniFile.SetFloat("HighlightGammaFactor", _highlightGammaFactor, "", "DepthOfField");
 	iniFile.SetFloat("MagnificationAreaWidth", _magnificationSettings.WidthMagnifierArea, "", "DepthOfField");
 	iniFile.SetFloat("MagnificationAreaHeight", _magnificationSettings.HeightMagnifierArea, "", "DepthOfField");
-	iniFile.SetBool("AnamorphicEnabled", _anamorphicEnabled, "", "DepthOfField");
-	iniFile.SetFloat("AnamorphicFactor", _anamorphicFactor, "", "DepthOfField");
+		iniFile.SetFloat("AnamorphicFactor", _anamorphicFactor, "", "DepthOfField");
 	iniFile.SetBool("AstigmatismEnabled", _astigmatismEnabled, "", "DepthOfField");
 	iniFile.SetFloat("AstigmatismStrength", _astigmatismStrength, "", "DepthOfField");
-	iniFile.SetFloat("AstigmatismRotation", _astigmatismRotation, "", "DepthOfField");
+		iniFile.SetFloat("AstigmatismRotation", _astigmatismRotation, "", "DepthOfField");
+		iniFile.SetBool("TiltEnabled", _tiltEnabled, "", "DepthOfField");
+		iniFile.SetInt("TiltMode", _tiltMode, "", "DepthOfField");
+		iniFile.SetFloat("TiltHorizontal", _tiltHorizontal, "", "DepthOfField");
+		iniFile.SetFloat("TiltVertical", _tiltVertical, "", "DepthOfField");
+		iniFile.SetFloat("TiltCrossSaddle", _tiltCrossSaddle, "", "DepthOfField");
+		iniFile.SetFloat("TiltCrossSaddleRotation", _tiltCrossSaddleRotation, "", "DepthOfField");
+		iniFile.SetFloat("TiltCornerTL", _tiltCornerTL, "", "DepthOfField");
+		iniFile.SetFloat("TiltCornerTR", _tiltCornerTR, "", "DepthOfField");
+		iniFile.SetFloat("TiltCornerBL", _tiltCornerBL, "", "DepthOfField");
+		iniFile.SetFloat("TiltCornerBR", _tiltCornerBR, "", "DepthOfField");
+		iniFile.SetFloat("TiltPivotX", _tiltPivotX, "", "DepthOfField");
+		iniFile.SetFloat("TiltPivotY", _tiltPivotY, "", "DepthOfField");
+		iniFile.SetBool("TiltShowOverlay", _tiltShowOverlay, "", "DepthOfField");
+		iniFile.SetBool("TiltTwoPass", _tiltTwoPass, "", "DepthOfField");
+
+		iniFile.SetBool("DistortionEnabled", _distortionEnabled, "", "DepthOfField");
+		iniFile.SetBool("DistortionShowGuide", _distortionShowGuide, "", "DepthOfField");
+		iniFile.SetBool("DistortionAutoFill", _distortionAutoFill, "", "DepthOfField");
+		iniFile.SetFloat("DistortionFillCrop", _distortionFillCrop, "", "DepthOfField");
+		iniFile.SetFloat("DistortionStrength", _distortionStrength, "", "DepthOfField");
+		iniFile.SetFloat("DistortionCurve", _distortionCurve, "", "DepthOfField");
+		iniFile.SetFloat("DistortionCenterX", _distortionCenterX, "", "DepthOfField");
+		iniFile.SetFloat("DistortionCenterY", _distortionCenterY, "", "DepthOfField");
+		iniFile.SetFloat("DistortionStartRadius", _distortionStartRadius, "", "DepthOfField");
+		iniFile.SetFloat("DistortionEndRadius", _distortionEndRadius, "", "DepthOfField");
+
+		iniFile.SetBool("PetzvalEnabled", _petzvalEnabled, "", "DepthOfField");
+		iniFile.SetFloat("PetzvalTangential", _petzvalTangential, "", "DepthOfField");
+		iniFile.SetFloat("PetzvalSagittal", _petzvalSagittal, "", "DepthOfField");
+		iniFile.SetFloat("PetzvalStrength", _petzvalStrength, "", "DepthOfField");
+		iniFile.SetFloat("PetzvalCenterX", _petzvalCenterX, "", "DepthOfField");
+		iniFile.SetFloat("PetzvalCenterY", _petzvalCenterY, "", "DepthOfField");
+		iniFile.SetBool("PetzvalShowGuide", _petzvalShowGuide, "", "DepthOfField");
 	iniFile.SetBool("VignettingEnabled", _vignettingEnabled, "", "DepthOfField");
 	iniFile.SetFloat("VignettingStart", _vignettingStart, "", "DepthOfField");
 	iniFile.SetFloat("VignettingEnd", _vignettingEnd, "", "DepthOfField");
-	iniFile.SetFloat("VignettingStrength", _vignettingStrength, "", "DepthOfField");
+		iniFile.SetFloat("VignettingStrength", _vignettingStrength, "", "DepthOfField");
+		iniFile.SetFloat("VignettingCenterX", _vignettingCenterX, "", "DepthOfField");
+		iniFile.SetFloat("VignettingCenterY", _vignettingCenterY, "", "DepthOfField");
+		iniFile.SetBool("VignettingShowGuide", _vignettingShowGuide, "", "DepthOfField");
 	iniFile.SetFloat("RingAngleOffset", _ringAngleOffset, "", "DepthOfField");
 	iniFile.SetFloat("RotationAngle", _apertureShapeSettings.RotationAngle, "", "DepthOfField");
 	iniFile.SetFloat("RoundFactor", _apertureShapeSettings.RoundFactor, "", "DepthOfField");
@@ -242,9 +374,8 @@ void DepthOfFieldController::startSession(reshade::api::effect_runtime* runtime)
 		return;
 	}
 
-	_tiltTwoPass = false;
-	_tiltPassSign = 1.0f;
-	calculateShapePoints();
+		_tiltPassSign = 1.0f;
+		calculateShapePoints();
 
 	{
 		std::scoped_lock lock(_reshadeStateMutex);
@@ -576,7 +707,7 @@ void DepthOfFieldController::createCircleDoFPoints()
 	float pointsOnRing = pointsFirstRing;
 	const float maxBokehRadius = _maxBokehSize / 2.0f;
 	const float focusDeltaHalf = _focusDelta / 2.0f;
-	const float anamorphicFactorToUse = _anamorphicEnabled ? _anamorphicFactor : 1.0f;
+		const float anamorphicFactorToUse = _anamorphicFactor;
 	for(int ringNo = 1; ringNo <= _quality; ringNo++)
 	{
 		const float anglePerPoint = 6.28318530717958f / pointsOnRing;
@@ -631,7 +762,7 @@ void DepthOfFieldController::createApertureShapedDoFPoints()
 	const float maxBokehRadius = _maxBokehSize / 2.0f;
 	const float focusDeltaHalf = _focusDelta / 2.0f;
 	const float anglePerVertex = 6.28318530717958f / (float)_apertureShapeSettings.NumberOfVertices;
-	const float anamorphicFactorToUse = _anamorphicEnabled ? _anamorphicFactor : 1.0f;
+		const float anamorphicFactorToUse = _anamorphicFactor;
 	for(int ringNo = 1; ringNo <= _quality; ringNo++)
 	{
 		float vertexAngleForFringe = 0.0f;
@@ -760,13 +891,7 @@ void DepthOfFieldController::startRender(reshade::api::effect_runtime* runtime)
 		return;
 	}
 
-	_tiltTwoPass = false;
-	const auto twoPassVariable = runtime->find_uniform_variable("IgcsDof.fx", "TiltedFocusPlaneTwoPass");
-	if(twoPassVariable.handle > 0)
-	{
-		runtime->get_uniform_value_bool(twoPassVariable, &_tiltTwoPass, 1, 0);
-	}
-	calculateShapePoints();
+		calculateShapePoints();
 
 	reshade::log::message(reshade::log::level::info, _tiltTwoPass ? "Dof render session started (Tilt two-pass)" : "Dof render session started");
 
